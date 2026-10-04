@@ -1,0 +1,324 @@
+//@version=6
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Zpa 03 · 支撑阻力（静态 + 动态 + 叠加理由数）
+//  ──────────────────────────────────────────────────────────────────────────────
+//  依据：「Z说交易」概念库 03-支撑阻力体系
+//
+//  体系原文：支撑阻力是价格行为的基石。掌握了支撑阻力和形态，就能自由组合出
+//  各种 Setup。做单要有多个支撑阻力位重叠 + 形态叠加，单一支撑阻力不行 ——
+//  「我进场的理由没有一个位置是少于两个的」。
+//
+//  内在逻辑：支撑阻力有效并非玄学，本质都是「被套住的一方需要解套 / 打平离场」。
+//
+//  静态支撑阻力（本脚本"前 7 类"）：
+//    ① 前高前低（波段高低点）   ② 前高前低的收盘价   ③ 昨日 / 上周高低点
+//    ④ 50% 回调位               ⑤ 缺口（体系最重要） ⑥ 趋势/通道起点（并入前高前低）
+//  动态支撑阻力：
+//    ⑦ EMA20 / VWAP              ⑧ Measured Move（见 Zpa 02 的 MM 投影）
+//
+//  叠加计数的实现：把所有静态候选位按容差聚类，落在同一区间的理由数合并计数，
+//  理由数越多线越粗越实 —— 这就是体系说的「一个区域里叠加的支撑阻力越多，
+//  越容易出现反转或突破」。
+//
+//  方向判定：side 按「相对现价的位置」决定 —— 价格在上方即转为支撑、在下方即
+//  转为阻力（前高被上破即转支撑），不按它当初是高点还是低点。
+//
+//  ⑤ 缺口的体系口径（不是跳空）：被反向实体突破的那根 K 线的极值就是缺口位，
+//  也就是「被套方打平离场」的价位 —— 向下缺口 = 阳线最低价，向上缺口 = 阴线最高价。
+//
+//  ⚠ 免责：按该体系的分析推演，不构成投资建议。
+// ═══════════════════════════════════════════════════════════════════════════════
+indicator("Zpa 03 · 支撑阻力（叠加）", "Zpa Levels", overlay = true, max_lines_count = 500, max_labels_count = 500, max_bars_back = 1000)
+
+
+// ═══════════════════════════════════ 参数 ═══════════════════════════════════
+
+string G1 = "静态位来源"
+int    pvK        = input.int(3, "分形左右宽度 K", minval = 1, maxval = 20, group = G1)
+bool   srcHiLo    = input.bool(true, "① 前高前低（波段高低点）", group = G1)
+bool   srcHiLoCl  = input.bool(true, "② 前高前低的收盘价", group = G1, tooltip = "体系：若有一根好趋势 K 线，会有顺势方买/卖它的收盘；若第二根跟随不好，买收盘的人会在入场位挂限价单打平，形成阻力。")
+bool   srcDay     = input.bool(true, "③ 昨日高低点", group = G1)
+bool   srcWeek    = input.bool(true, "③ 上周高低点", group = G1)
+bool   srcMid     = input.bool(true, "④ 50% 回调位", group = G1, tooltip = "体系：从起涨点到最高点回调 50% 位置；多空盈亏比 1:1，但顺势方胜率约 60%。")
+bool   srcGap     = input.bool(true, "⑤ 缺口位（体系最重要的支撑阻力）", group = G1, tooltip = "体系口径：被反向实体（收盘价）突破的那根 K 线的极值即缺口位 —— 向下缺口取阳线最低价、向上缺口取阴线最高价。这是「被套方打平离场」的价位，不是跳空空洞。")
+
+string G2 = "聚类与强度"
+float  tolAtr     = input.float(0.25, "聚类容差（ATR ×）", minval = 0.02, maxval = 2.0, step = 0.01, group = G2, tooltip = "落在同一容差带内的候选位视为「同一个位置」，理由数合并 —— 这就是叠加。")
+int    maxLevels  = input.int(16, "最多保留位置数", minval = 4, maxval = 40, group = G2)
+int    strongNum  = input.int(2, "强叠加位的最少理由数", minval = 1, maxval = 6, group = G2, tooltip = "体系铁律：至少要「一个支撑阻力 + 一个形态」两个理由叠加才构成 Setup。理由数达到该值的线加粗实线。")
+
+string G3 = "动态位"
+bool   showEma    = input.bool(true, "EMA20（动态支撑阻力）", group = G3)
+bool   showVwap   = input.bool(false, "VWAP（日内，动态支撑阻力）", group = G3)
+bool   showMid50  = input.bool(true, "窗口 50% 位（动态）", group = G3)
+int    midLook    = input.int(50, "窗口 50% 位的回看根数", minval = 5, maxval = 500, group = G3)
+
+string G4 = "显示"
+int    visBars    = input.int(120, "向左回溯绘制根数", minval = 10, maxval = 500, group = G4)
+int    extendBars = input.int(24, "向右延伸根数", minval = 0, maxval = 400, group = G4)
+bool   onlyStrong = input.bool(false, "只显示强叠加位（理由数 ≥ 阈值）", group = G4)
+bool   showPanel  = input.bool(true, "显示最强叠加位面板", group = G4)
+int    panelRows  = input.int(6, "面板列出条数", minval = 3, maxval = 15, group = G4)
+color  resCol     = input.color(#ef5350, "阻力（价格下方→上方压制）", group = G4)
+color  supCol     = input.color(#26a69a, "支撑（价格上方→下方承接）", group = G4)
+
+
+// ═══════════════════════════ 候选池（聚类容器）═══════════════════════════
+// 体系说的「叠加」是不同类型理由的叠加：一个区域同时是前高 + 缺口 + 50% 位，
+// 才算 3 个理由。同一类型（如多个前低落在同一带内）只算 1 个理由，另记命中次数。
+// cCnt = 不同类型理由数（强度）；cHit = 总命中次数（被多少个价位验证过）
+
+var array<float>  cPx  = array.new<float>()
+var array<string> cNm  = array.new<string>()
+var array<int>    cCnt = array.new<int>()
+var array<int>    cHit = array.new<int>()
+var array<int>    cLst = array.new<int>()
+
+addCand(float p, string nm, float tol) =>
+    if not na(p)
+        int found = -1
+        int n = array.size(cPx)
+        if n > 0
+            for i = 0 to n - 1
+                if math.abs(array.get(cPx, i) - p) <= tol
+                    found := i
+                    break
+        if found >= 0
+            string prev = array.get(cNm, found)
+            array.set(cLst, found, bar_index)
+            array.set(cHit, found, array.get(cHit, found) + 1)
+            if not str.contains(prev, nm)
+                array.set(cCnt, found, array.get(cCnt, found) + 1)
+                array.set(cNm, found, prev + " + " + nm)
+        else
+            array.push(cPx, p)
+            array.push(cNm, nm)
+            array.push(cCnt, 1)
+            array.push(cHit, 1)
+            array.push(cLst, bar_index)
+        if array.size(cPx) > maxLevels
+            int m = array.size(cPx)
+            int worst = 0
+            for i = 1 to m - 1
+                if array.get(cLst, i) < array.get(cLst, worst)
+                    worst := i
+            array.remove(cPx, worst)
+            array.remove(cNm, worst)
+            array.remove(cCnt, worst)
+            array.remove(cHit, worst)
+            array.remove(cLst, worst)
+
+
+// ═══════════════════════════════ 候选位收集 ═══════════════════════════════
+
+float atrV = ta.atr(14)
+// ATR 未就绪（前 14 根）时退化为固定 tick 容差，避免 tol 为 na 导致聚类失效
+float tol  = math.max(nz(tolAtr * atrV, 4 * syminfo.mintick), 2 * syminfo.mintick)
+
+// ① ② 前高前低 + 其收盘价
+float phv = ta.pivothigh(high, pvK, pvK)
+float plv = ta.pivotlow(low, pvK, pvK)
+
+if not na(phv)
+    if srcHiLo
+        addCand(phv, "前高", tol)
+    if srcHiLoCl
+        addCand(close[pvK], "前高收", tol)
+if not na(plv)
+    if srcHiLo
+        addCand(plv, "前低", tol)
+    if srcHiLoCl
+        addCand(close[pvK], "前低收", tol)
+
+// ④ 50% 回调位：由相邻的反向 pivot 构成的波段中点
+var float lastHi = na
+var float lastLo = na
+if not na(phv) and not na(lastLo) and srcMid
+    addCand((lastLo + phv) / 2, "50%位", tol)
+if not na(plv) and not na(lastHi) and srcMid
+    addCand((lastHi + plv) / 2, "50%位", tol)
+if not na(phv)
+    lastHi := phv
+if not na(plv)
+    lastLo := plv
+
+// ③ 昨日 / 上周高低点（取已收盘的前一根，避免未来函数）
+float dayHi = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
+float dayLo = request.security(syminfo.tickerid, "D", low[1], lookahead = barmerge.lookahead_on)
+float wkHi  = request.security(syminfo.tickerid, "W", high[1], lookahead = barmerge.lookahead_on)
+float wkLo  = request.security(syminfo.tickerid, "W", low[1], lookahead = barmerge.lookahead_on)
+
+bool newDay = ta.change(time("D")) != 0
+bool newWk  = ta.change(time("W")) != 0
+
+if newDay
+    if srcDay
+        addCand(dayHi, "昨高", tol)
+        addCand(dayLo, "昨低", tol)
+if newWk
+    if srcWeek
+        addCand(wkHi, "周高", tol)
+        addCand(wkLo, "周低", tol)
+
+// ⑤ 缺口位（体系口径：被反向实体突破的那根 K 线的极值 = 被套方打平价）
+//    向下缺口 = 阴线实体跌破的那根【阳线的最低价】
+//    向上缺口 = 阳线实体突破的那根【阴线的最高价】
+var float lastBullLow  = na
+var float lastBearHigh = na
+
+var array<float> gpLv  = array.new<float>()
+var array<int>   gpDir = array.new<int>()          // +1 向上缺口 / -1 向下缺口
+
+// 回补检查（引线触及缺口位即算，对应「限价单能打平」）
+if array.size(gpLv) > 0
+    int ng = array.size(gpLv)
+    for i = ng - 1 to 0
+        bool  up = array.get(gpDir, i) > 0
+        float lv = array.get(gpLv, i)
+        bool  hit = up ? low <= lv : high >= lv
+        if hit
+            array.remove(gpLv, i)
+            array.remove(gpDir, i)
+
+bool isBullB = close > open
+bool isBearB = close < open
+
+// 去重规则：同方向 + 同价位上若已有【未回补】缺口 → 不另记（那是同一批被套方）。
+// 本文件里 gpLv 只存未回补缺口（一旦回补即从数组移除 = 让出该价位），故直接查表即可。
+// ⚠ 不设 used 标志：同一个极值可能被不同 K 线各突破一次（各自成立）。
+gapOpenHere(int d, float p) =>
+    bool found = false
+    if array.size(gpLv) > 0
+        for i = array.size(gpLv) - 1 to 0
+            if array.get(gpDir, i) == d and math.abs(array.get(gpLv, i) - p) < syminfo.mintick
+                found := true
+                break
+    found
+
+if srcGap and isBearB and not na(lastBullLow) and close < lastBullLow - syminfo.mintick and not gapOpenHere(-1, lastBullLow)
+    addCand(lastBullLow, "缺口", tol)
+    array.push(gpLv, lastBullLow)
+    array.push(gpDir, -1)
+if srcGap and isBullB and not na(lastBearHigh) and close > lastBearHigh + syminfo.mintick and not gapOpenHere(1, lastBearHigh)
+    addCand(lastBearHigh, "缺口", tol)
+    array.push(gpLv, lastBearHigh)
+    array.push(gpDir, 1)
+
+if isBullB
+    lastBullLow := low
+if isBearB
+    lastBearHigh := high
+
+// 安全阀：gpLv 只存【未回补】缺口（回补即移除），所以它天然很小。
+// ⚠ 这张表同时充当去重表 → 尽量不要裁到未回补项，否则该价位会被重复收集。
+//    真被裁到时也不会污染「理由数」：addCand 对同名理由不做二次计数。
+if array.size(gpLv) > 60
+    array.shift(gpLv)
+    array.shift(gpDir)
+
+
+// ═══════════════════════════════ 动态位 ═══════════════════════════════
+
+float ema20 = ta.ema(close, 20)
+float vwapV = ta.vwap(hlc3)
+
+float midHi = ta.highest(high, midLook)
+float midLo = ta.lowest(low, midLook)
+float mid50 = (midHi + midLo) / 2
+
+plot(showEma ? ema20 : na, title = "EMA20", color = color.new(#2962ff, 0), linewidth = 2)
+plot(showVwap ? vwapV : na, title = "VWAP", color = color.new(#ab47bc, 0), linewidth = 2, style = plot.style_linebr)
+plot(showMid50 ? mid50 : na, title = "窗口50%位", color = color.new(#ff9800, 30), linewidth = 1, style = plot.style_stepline)
+
+
+// ═══════════════════════════ 绘制（最后 bar 全量重绘）═══════════════════════
+
+var array<line>  dLines  = array.new<line>()
+var array<label> dLabels = array.new<label>()
+
+sortIdxDesc(array<int> src) =>
+    array<int> out = array.new<int>()
+    int n = array.size(src)
+    if n > 0
+        for i = 0 to n - 1
+            array.push(out, i)
+        if n >= 2
+            for i = 0 to n - 2
+                for j = 0 to n - 2 - i
+                    int a = array.get(out, j)
+                    int b = array.get(out, j + 1)
+                    if array.get(src, a) < array.get(src, b)
+                        array.set(out, j, b)
+                        array.set(out, j + 1, a)
+    out
+
+if barstate.islast
+    int nl = array.size(dLines)
+    if nl > 0
+        for i = 0 to nl - 1
+            line.delete(array.get(dLines, i))
+        array.clear(dLines)
+    int nc = array.size(dLabels)
+    if nc > 0
+        for i = 0 to nc - 1
+            label.delete(array.get(dLabels, i))
+        array.clear(dLabels)
+
+    int m = array.size(cPx)
+    if m > 0
+        int xL = math.max(0, bar_index - visBars)
+        for i = 0 to m - 1
+            float y  = array.get(cPx, i)
+            int   c  = array.get(cCnt, i)
+            int   ht = array.get(cHit, i)
+            bool  strong = c >= strongNum
+            if not (onlyStrong and not strong)
+                bool  isSup = y < close
+                color col   = isSup ? supCol : resCol
+                line ln = line.new(xL, y, bar_index + extendBars, y, color = strong ? col : color.new(col, 60), width = math.min(c, 4), style = strong ? line.style_solid : line.style_dotted)
+                array.push(dLines, ln)
+                label lb = label.new(bar_index + extendBars, y, text = (isSup ? "支撑 " : "阻力 ") + array.get(cNm, i) + "  [" + str.tostring(c) + "类/" + str.tostring(ht) + "次]", style = label.style_label_left, color = color.new(col, 82), textcolor = color.new(col, 0), size = size.tiny)
+                array.push(dLabels, lb)
+
+
+// ═══════════════════════════ 最强叠加位面板 ═══════════════════════════
+
+var table pnlL = table.new(position.bottom_right, 5, 12, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 45))
+
+if showPanel and barstate.islast
+    table.clear(pnlL, 0, 0, 4, 11)
+    table.merge_cells(pnlL, 0, 0, 4, 0)
+    table.cell(pnlL, 0, 0, "Zpa 03 · 最强叠加位", text_color = color.white, bgcolor = color.new(#37474f, 0), text_size = size.small, text_halign = text.align_center)
+    table.cell(pnlL, 0, 1, "角色", text_color = color.new(#263238, 0), bgcolor = color.new(#eceff1, 0), text_size = size.tiny, text_halign = text.align_left)
+    table.cell(pnlL, 1, 1, "价格", text_color = color.new(#263238, 0), bgcolor = color.new(#eceff1, 0), text_size = size.tiny, text_halign = text.align_left)
+    table.cell(pnlL, 2, 1, "理由", text_color = color.new(#263238, 0), bgcolor = color.new(#eceff1, 0), text_size = size.tiny, text_halign = text.align_left)
+    table.cell(pnlL, 3, 1, "命中", text_color = color.new(#263238, 0), bgcolor = color.new(#eceff1, 0), text_size = size.tiny, text_halign = text.align_left)
+    table.cell(pnlL, 4, 1, "叠加的理由（不同类型）", text_color = color.new(#263238, 0), bgcolor = color.new(#eceff1, 0), text_size = size.tiny, text_halign = text.align_left)
+
+    int m = array.size(cPx)
+    if m > 0
+        array<int> order = sortIdxDesc(cCnt)
+        int r = 2
+        for k = 0 to math.min(m, panelRows) - 1
+            int i = array.get(order, k)
+            float y = array.get(cPx, i)
+            int   c = array.get(cCnt, i)
+            bool isSup = y < close
+            color col = isSup ? supCol : resCol
+            color rowBg = color.new(col, 90)
+            table.cell(pnlL, 0, r, isSup ? "支撑" : "阻力", text_color = color.new(#263238, 0), bgcolor = rowBg, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(pnlL, 1, r, str.tostring(y, format.mintick), text_color = color.new(#263238, 0), bgcolor = rowBg, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(pnlL, 2, r, str.tostring(c) + (c >= strongNum ? " ★" : ""), text_color = color.new(#263238, 0), bgcolor = rowBg, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(pnlL, 3, r, str.tostring(array.get(cHit, i)), text_color = color.new(#263238, 0), bgcolor = rowBg, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(pnlL, 4, r, array.get(cNm, i), text_color = color.new(#263238, 0), bgcolor = rowBg, text_size = size.tiny, text_halign = text.align_left)
+            r += 1
+
+        if r <= 11
+            table.merge_cells(pnlL, 0, r, 4, r)
+            table.cell(pnlL, 0, r, "当前价 " + str.tostring(close, format.mintick) + "　·　理由数 ≥ " + str.tostring(strongNum) + " 才构成可执行 Setup 的一半", text_color = color.new(#546e7a, 0), bgcolor = color.new(#fafafa, 0), text_size = size.tiny, text_halign = text.align_left)
+
+
+// ═════════════════════════════ 告警 ═════════════════════════════
+
+alertcondition(not na(phv), "Zpa 出现前高", "形成新的波段高点")
+alertcondition(not na(plv), "Zpa 出现前低", "形成新的波段低点")

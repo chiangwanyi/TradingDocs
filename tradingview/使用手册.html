@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zpa · TradingView 指标套件 · 使用手册</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --text:#1c2024; --dim:#5b6470;
+    --accent:#1f6feb; --exact:#0f9d58; --approx:#d9822b; --manual:#7c4dff;
+    --mono:"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 72px}
+
+  header{border-bottom:2px solid var(--text);padding-bottom:20px;margin-bottom:36px}
+  h1{font-size:28px;margin:0 0 8px;letter-spacing:-.3px}
+  .sub{color:var(--dim);font-size:14px;margin:0}
+  .chip{display:inline-block;font:12px/1.6 var(--mono);background:#eef2f7;color:var(--dim);
+        border:1px solid var(--line);border-radius:3px;padding:2px 8px;margin-right:6px}
+
+  h2{font-size:18px;margin:44px 0 14px;padding-left:11px;border-left:4px solid var(--accent)}
+  h3{font-size:15px;margin:22px 0 8px}
+  p{margin:8px 0}
+  code{font:13px var(--mono);background:#eef1f5;border-radius:3px;padding:1px 5px}
+
+  .grid{display:grid;gap:14px}
+  .g4{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:760px){.g4{grid-template-columns:1fr}}
+
+  .mod{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+  .mod h4{margin:0 0 4px;font-size:15px}
+  .mod .src{font:12px var(--mono);color:var(--accent);margin-bottom:8px}
+  .mod p{margin:0;font-size:13.5px;color:var(--dim)}
+  .mod ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:var(--dim)}
+  .mod li{margin:3px 0}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);
+        border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13.5px}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#eef2f7;font-weight:600;font-size:13px;color:#2b3641}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:12.5px}
+
+  .tag{display:inline-block;font-size:11.5px;font-weight:600;border-radius:3px;
+       padding:1px 7px;white-space:nowrap;line-height:1.7}
+  .t-exact{background:#e6f4ea;color:var(--exact);border:1px solid #bfe3ca}
+  .t-approx{background:#fdf1e3;color:var(--approx);border:1px solid #f5d9b3}
+  .t-manual{background:#f0e9ff;color:var(--manual);border:1px solid #d8c8ff}
+
+  .flow{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;overflow-x:auto}
+  .flow svg{display:block;margin:0 auto}
+
+  .steps{counter-reset:s;list-style:none;padding:0;margin:0}
+  .steps li{counter-increment:s;position:relative;padding:9px 0 9px 42px;
+            border-bottom:1px dashed var(--line);font-size:14px}
+  .steps li:last-child{border-bottom:none}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:9px;
+    width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+    font:600 13px/26px var(--mono);text-align:center}
+
+  .note{background:#fff;border:1px solid var(--line);border-left:4px solid var(--approx);
+        border-radius:6px;padding:12px 16px;font-size:13.5px;color:#3b4550;margin:14px 0}
+  .note.warn{border-left-color:#d93025}
+
+  .ok{background:#e6f4ea;border:1px solid #bfe3ca;border-radius:6px;padding:12px 16px;
+      font-size:13.5px;color:#14532d;margin:14px 0}
+
+  footer{margin-top:52px;padding-top:18px;border-top:1px solid var(--line);
+         font-size:12.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Zpa · TradingView 指标套件</h1>
+  <p class="sub">把「Z说交易」价格行为体系的核心概念，落成 4 个可在 TradingView 直接运行的 Pine Script v6 指标。</p>
+  <p style="margin-top:12px">
+    <span class="chip">Pine Script v6</span>
+    <span class="chip">4 个独立指标</span>
+    <span class="chip">零外部依赖</span>
+    <span class="chip">缺口口径已与 CLI 逐条对齐验证</span>
+  </p>
+</header>
+
+<div class="note">
+  <b>设计立场</b>：这套指标不把体系「翻译」成均线金叉那类技术指标，而是把体系原文里的<b>定性判断换成图上可量化的证据</b> ——
+  每一条证据的取值都公开在面板里，供人复核，而不是替你下结论。
+</div>
+
+<h2>一、四个模块</h2>
+<div class="grid g4">
+
+  <div class="mod">
+    <h4>Zpa 01 · 市场背景（二元决策 + 趋势线/通道线 + 分段）</h4>
+    <div class="src">概念库 01-市场背景与二元决策</div>
+    <p>判断【趋势 / 震荡】，并细分 突破·急速 / 窄通道 / 宽通道 / 震荡区间；同时画出<b>趋势线与通道线</b>，并按当前市场周期把图<b>分段</b>。</p>
+    <ul>
+      <li>证据全部量化上板：波段结构、缺口敞开、回调深度时长、重叠度、逆势跟随、K 线质量、<b>通道质量</b>（八项加权 → 趋势分 → 分级）</li>
+      <li>扩张三角形单独识别（高点抬高 + 低点降低）</li>
+      <li><b>趋势线</b> = 最近两个同向枢轴连线；<b>通道线</b> = 平行的、过中间那个对面极值（原文「两个点画出第三个点」）</li>
+      <li><b>重要高低点</b> = 最强那段推进的起点（原文「强势突破前面的低点就是重要低点」）</li>
+      <li><b>通道过充 / 过靶</b>：引线冲出通道线；若收盘也站上则不算过充，是通道被上破</li>
+      <li><b>趋势线破位 + 通道 MM 一倍目标</b>（破位价 ± 通道高度）</li>
+      <li><b>背景分段带</b>：切段需「连续 3 根确认 + 旧段活够 8 根」，避免碎片段</li>
+      <li>趋势线<b>只标位置、不出信号</b> —— 原文要求「等价格测试后出现反应才能进场，不能盲目预判」</li>
+    </ul>
+  </div>
+
+  <div class="mod">
+    <h4>Zpa 02 · 突破缺口（Gap）</h4>
+    <div class="src">概念库 02-缺口理论（体系 70% 与缺口相关）</div>
+    <p>检测缺口、追踪敞开与回补、分类、投射 Measured Move 目标。</p>
+    <ul>
+      <li><b>缺口是一个「价位」，不是跳空区间</b>：被反向实体（收盘价）突破的那根 K 线的极值就是缺口位 —— 向下取<b>阳线最低价</b>、向上取<b>阴线最高价</b>，即被套方打平价</li>
+      <li>参考 K 线 = 往前找<b>最近的一根反向实体 K 线</b>，中间可隔同向 K 线（B1阳 / B2阴 / B3阴，B3 收盘 &lt; B1 最低 → 缺口位是 B1 的最低价）</li>
+      <li><b>去重</b>：同方向 + 同价位上若已有<b>未回补</b>缺口就不另记；一旦回补就<b>让出</b>该价位，之后再次被突破算新的一批被套方。
+        <span style="color:var(--dim)">（所以同一价位可以合法地出现多次，只要中间被回补过）</span></li>
+      <li>缺口行为三要点：能否制造 → 能否回补 → 回补耗时</li>
+      <li>「撑过 N 根」判突破型、「N 根内回补」判假突破；<b>隔一根</b>的微缺口单独标记</li>
+      <li>最后一个缺口橙色高亮（引导趋势开始的机构位）</li>
+      <li><b>「最多保留缺口数」只影响画线与面板</b>，不改变缺口检出与未回补计数（口径表不裁剪）</li>
+    </ul>
+  </div>
+
+  <div class="mod">
+    <h4>Zpa 03 · 支撑阻力（叠加）</h4>
+    <div class="src">概念库 03-支撑阻力体系</div>
+    <p>「我进场的理由没有一个位置是少于两个的。」</p>
+    <ul>
+      <li>6 类静态位 + 3 类动态位统一聚类</li>
+      <li><b>理由数按「不同类型」计数</b>：前高 + 缺口 + 50%位 = 3 个理由</li>
+      <li>同类多次命中另记「命中次数」</li>
+      <li>side 按相对现价判定：前高被上破即转支撑</li>
+    </ul>
+  </div>
+
+  <div class="mod">
+    <h4>Zpa 04 · Setup 信号与自检</h4>
+    <div class="src">概念库 05-入场Setup / 06-止损与目标位</div>
+    <p>强制执行铁律：<b>≥1 个支撑阻力 + ≥1 个形态</b>才出提示，理由不足则不做。</p>
+    <ul>
+      <li>M2B / M2S、二次回补缺口失败、II / OI</li>
+      <li>微缺口自检：当根没制造微缺口 → 打 ⚠（有概率不是最终拐点）</li>
+      <li>面板公开「支撑阻力 ✓/✗」「形态 ✓/✗」与理由清单</li>
+    </ul>
+  </div>
+
+</div>
+
+<h2>二、证据链</h2>
+<div class="flow">
+<svg viewBox="0 0 940 300" width="100%" style="max-width:940px" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#8a94a0"/>
+    </marker>
+  </defs>
+
+  <!-- 输入 -->
+  <rect x="8" y="112" width="126" height="76" rx="7" fill="#eef2f7" stroke="#d3dae2"/>
+  <text x="71" y="142" font-size="13" font-weight="600" fill="#2b3641" text-anchor="middle">OHLC 数据</text>
+  <text x="71" y="161" font-size="11.5" fill="#5b6470" text-anchor="middle">TradingView 图表</text>
+  <text x="71" y="177" font-size="11.5" fill="#5b6470" text-anchor="middle">唯一事实来源</text>
+
+  <!-- 01 -->
+  <rect x="176" y="24" width="180" height="72" rx="7" fill="#fff" stroke="#1f6feb" stroke-width="1.6"/>
+  <text x="266" y="48" font-size="13" font-weight="700" fill="#1f6feb" text-anchor="middle">01 定背景</text>
+  <text x="266" y="67" font-size="11.5" fill="#5b6470" text-anchor="middle">趋势 / 震荡 + 分级</text>
+  <text x="266" y="84" font-size="11.5" fill="#5b6470" text-anchor="middle">趋势线·通道线·重要位·分段</text>
+
+  <!-- 02 -->
+  <rect x="176" y="112" width="180" height="72" rx="7" fill="#fff" stroke="#0f9d58" stroke-width="1.6"/>
+  <text x="266" y="138" font-size="13" font-weight="700" fill="#0f9d58" text-anchor="middle">02 找缺口</text>
+  <text x="266" y="158" font-size="11.5" fill="#5b6470" text-anchor="middle">敞开 / 回补 / 分类</text>
+  <text x="266" y="174" font-size="11.5" fill="#5b6470" text-anchor="middle">→ 判强度 · 定目标位</text>
+
+  <!-- 03 -->
+  <rect x="176" y="200" width="180" height="72" rx="7" fill="#fff" stroke="#d9822b" stroke-width="1.6"/>
+  <text x="266" y="226" font-size="13" font-weight="700" fill="#d9822b" text-anchor="middle">03 找位</text>
+  <text x="266" y="246" font-size="11.5" fill="#5b6470" text-anchor="middle">静态位 + 动态位</text>
+  <text x="266" y="262" font-size="11.5" fill="#5b6470" text-anchor="middle">聚类 → 叠加理由数</text>
+
+  <!-- 04 -->
+  <rect x="406" y="112" width="180" height="72" rx="7" fill="#fff" stroke="#7c4dff" stroke-width="1.6"/>
+  <text x="496" y="138" font-size="13" font-weight="700" fill="#7c4dff" text-anchor="middle">04 等触发</text>
+  <text x="496" y="158" font-size="11.5" fill="#5b6470" text-anchor="middle">≥1 支撑阻力 + ≥1 形态</text>
+  <text x="496" y="174" font-size="11.5" fill="#5b6470" text-anchor="middle">+ 微缺口自检</text>
+
+  <!-- 结论 -->
+  <rect x="636" y="88" width="150" height="120" rx="7" fill="#eef2f7" stroke="#d3dae2"/>
+  <text x="711" y="122" font-size="13" font-weight="600" fill="#2b3641" text-anchor="middle">人工判读</text>
+  <text x="711" y="146" font-size="11.5" fill="#5b6470" text-anchor="middle">结构必须在图上</text>
+  <text x="711" y="162" font-size="11.5" fill="#5b6470" text-anchor="middle">再确认一次</text>
+  <text x="711" y="186" font-size="11.5" fill="#8a94a0" text-anchor="middle">脚本只给证据</text>
+
+  <!-- 下游 -->
+  <rect x="822" y="112" width="110" height="72" rx="7" fill="#f7f8fa" stroke="#d3dae2" stroke-dasharray="4 3"/>
+  <text x="877" y="140" font-size="12" fill="#5b6470" text-anchor="middle">Zpa CLI</text>
+  <text x="877" y="158" font-size="11" fill="#8a94a0" text-anchor="middle">数据校验</text>
+  <text x="877" y="174" font-size="11" fill="#8a94a0" text-anchor="middle">+ 分析报告</text>
+
+  <!-- 箭头 -->
+  <path d="M134,132 C154,132 156,60 176,60" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M134,150 L176,148" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M134,168 C154,168 156,236 176,236" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M356,60 C382,60 384,132 406,140" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M356,148 L406,148" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M356,236 C382,236 384,164 406,156" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M586,148 L636,148" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+  <path d="M786,148 L822,148" stroke="#8a94a0" stroke-width="1.4" fill="none" marker-end="url(#ar)"/>
+
+  <text x="470" y="290" font-size="11.5" fill="#8a94a0" text-anchor="middle">背景优先 → 缺口判强度 → 支撑阻力找叠加 → 触发与自检</text>
+</svg>
+</div>
+
+<h2>三、体系概念 → 指标实现</h2>
+<p style="font-size:13.5px;color:var(--dim)">
+三色标记的诚实度：<span class="tag t-exact">精确</span> 已用真实数据逐条对比验证 ·
+<span class="tag t-approx">近似</span> 工程代理量，需人工复核 ·
+<span class="tag t-manual">人工</span> 脚本无法识别，只能人看图。
+</p>
+
+<table>
+<thead><tr><th style="width:26%">体系概念</th><th style="width:14%">在哪个模块</th><th>指标里的实现</th><th style="width:9%">可靠度</th></tr></thead>
+<tbody>
+<tr><td>缺口（突破型缺口的判定与回补）</td><td>02 / 01 / 03 / 04</td>
+    <td><b>体系口径</b>：被反向实体（收盘价）突破的那根 K 线的极值就是缺口位 —— 向下取阳线最低价、向上取阴线最高价，即「被套方打平价」。回补 = 引线触及该价位。
+        去重 = 「同方向 + 同价位上若已有<b>未回补</b>缺口就不另记」；缺口一旦回补就<b>让出</b>该价位，之后再次被反向实体突破算<b>新的一批</b>被套方。
+        <br><span style="color:var(--dim)">⚠ 参考 K 线取「往前最近一根反向实体」（你确认的口径）；原文另提到「或者波段高低点」，那半句未单独实现 → 长趋势里检出偏多</span></td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>波段高低点（前高前低）</td><td>01 / 03</td>
+    <td>对称严格分形 pivot，与 CLI <code>swing_points</code> 同口径</td>
+    <td><span class="tag t-exact">精确</span></td></tr>
+<tr><td>二元决策：趋势 / 震荡</td><td>01</td>
+    <td><b>八项</b>证据加权打分 → 趋势分 → 五档分级（含扩张三角形；<b>窄通道优先于突破/急速</b>）</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>趋势五证据</td><td>01</td>
+    <td>结构=高低点递增比例；缺口=敞开与否；回调=深度%+持续根数；跟随=逆势最长连续；K线质量=实体饱满比例；<b>通道质量</b>=趋势线是否完好</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>缺口行为三要点</td><td>02</td>
+    <td>①撑过 N 根判「有跟随」 ②N 根内回补判「假突破」 ③未回补缺口持续公开「已敞开多少根」</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>测量缺口 → Measured Move</td><td>02</td>
+    <td>缺口位 ± 缺口前 N 根波段高度（最高−最低），画 MM 目标线</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>微缺口</td><td>02 / 04</td>
+    <td>前一根与后一根之间、<b>中间隔一根</b>形成的微型缺口（<code>high[2]/low[2]</code> 与当根比较，无未来函数）；宽度超阈值的视为普通缺口</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>「实体缺口」层</td><td>—</td>
+    <td><b>未实现</b>。体系 §2.3「逆势方能拿到的最好结果就是回补实体缺口」，但取「被突破 K 的实体边缘」还是「两个实体之间的空隙」尚未确认，本次只出引线极值这一层</td>
+    <td><span class="tag t-manual">人工</span></td></tr>
+<tr><td>精准 MM 缺口</td><td>02</td>
+    <td>只做「测量缺口 + MM 目标位」投影；<b>「反应是否强烈」无法脚本化</b></td>
+    <td><span class="tag t-manual">人工</span></td></tr>
+<tr><td>支撑阻力叠加原则</td><td>03</td>
+    <td>容差带内聚类，理由数<b>按类型去重</b>计数，同类多次命中另记命中次数</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>前高前低的收盘价</td><td>03</td>
+    <td>pivot 那根 K 线的 close 单独作为候选位</td>
+    <td><span class="tag t-exact">精确</span></td></tr>
+<tr><td>昨日 / 上周高低点</td><td>03</td>
+    <td><code>request.security</code> 取已收盘的前一根，<b>无未来函数</b></td>
+    <td><span class="tag t-exact">精确</span></td></tr>
+<tr><td>50% 回调位</td><td>03</td>
+    <td>相邻反向 pivot 构成的波段中点</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>M2B / M2S（两段式回调到均线）</td><td>04</td>
+    <td>近似为「曾显著离开均线 + 回踩均线附近 + 信号 K」</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>二次回补缺口失败</td><td>04</td>
+    <td>缺口旁两次测试、两极值彼此接近、始终未回补 + 信号 K</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>II / OI / IIOI 内包外包</td><td>04</td>
+    <td>内包/外包 K 线的组合判定</td>
+    <td><span class="tag t-exact">精确</span></td></tr>
+<tr><td>微缺口自检</td><td>02 / 04</td>
+    <td>当根是否制造缺口 + 宽度 vs ATR；信号标签上打 ✓ / ⚠</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>楔形 / 三推 / 旗形 / 三角形</td><td>—</td>
+    <td><b>未实现</b>：图形形态识别无法可靠脚本化，需人工在图上判读</td>
+    <td><span class="tag t-manual">人工</span></td></tr>
+<tr><td><b>趋势线</b></td><td>01</td>
+    <td>取<b>最近两个同向枢轴</b>连线（上涨取更高的低点、下跌取更低的高点），两点间隔 ≥ 8 根。原文只说「发现更高高点或更低低点，连接即可」，<b>没规定取哪两个</b> —— 「取最近两个」是工程选择
+        <br><span style="color:var(--dim)">本数据末段给出一条斜率 −0.81 点/根、贴着价格走的下跌趋势线，人看图可能不会画它 —— 这是规则使然，所以它只是参考线（且原文明确「趋势线不是信号」）</span></td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>通道线</b></td><td>01</td>
+    <td>与趋势线<b>平行</b>、过「两个取点之间」区间内对面那个极值（原文「通道由两个点画出第三个点」）。通道高度 = 两线垂直距离；<code>高度 / ATR &lt; 2.5</code> 记窄通道</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>重要高低点</b></td><td>01</td>
+    <td>不是任何一个波段点，而是<b>最强那段推进的起点</b>（幅度 ≥ 1.5 ATR、持续 ≥ 5 根）。原文「强势突破前面的低点就是重要低点」没给阈值 → <b>本数据只出 4 个</b>，需人工确认</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>通道过充 / 过靶</b></td><td>01</td>
+    <td>有界事件：引线冲出通道线起、到收盘回到通道内止。收盘也站上则<b>不算过充</b>，那是通道被上破。
+        <br><span style="color:var(--dim)">原文「通道过靶大概率五根 K 线内反转」：本数据真过充只有 <b>1</b> 次（5 根内收回）—— <b>1/1，不能当统计结论</b></span></td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>趋势线破位</b></td><td>01</td>
+    <td>收盘越过趋势线<b>超过 0.15 ATR</b> 才算破位（否则一根引线就把线打掉）。对应 MTR 的第一个条件</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>通道 MM 一倍目标</b></td><td>01</td>
+    <td>破位价 ± <b>通道高度</b>。原文说要拉「区间形成段」的一倍，两者不保证相等</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td><b>背景分段</b>（当前市场周期）</td><td>01</td>
+    <td>逐根分级后切段，双闸门：连续 3 根确认 + 旧段活够 8 根。<b>本数据 198 根切出 17 段</b>，段数偏多，看的时候以「当前这一段」为主</td>
+    <td><span class="tag t-approx">近似</span></td></tr>
+<tr><td>趋势线的选择 / 通道重画时机</td><td>—</td>
+    <td><b>人工</b>：指标只画「最近两个同向枢轴」这一条，同一段走势里人可能画在别处；通道失效后还算不算数也是人的判断</td>
+    <td><span class="tag t-manual">人工</span></td></tr>
+<tr><td>「逆势方止损单能否赚钱」</td><td>—</td>
+    <td><b>未实现</b>：体系用来判趋势强度的关键观察，需要人盯盘</td>
+    <td><span class="tag t-manual">人工</span></td></tr>
+</tbody>
+</table>
+
+<h2>四、口径验证结果</h2>
+<div class="ok">
+  <b>缺口口径已按体系原文重写，两条独立实现路径互验一致。</b><br>
+  测试数据：<code>reports/MNQ-5m-2026-09-25.facts.json</code>（MNQ 5 分钟，198 根 K 线，tickSize 0.01）<br>
+  · 路径 A「回扫版」检出 <b>55</b> 条　·　路径 B「Pine 状态机版」检出 <b>55</b> 条<br>
+  · 仅 A 有而 B 无：<b>0 条</b>　·　仅 B 有而 A 无：<b>0 条</b>　·　回补状态不一致：<b>0 条</b><br>
+  · 其中未回补 <b>5</b> 条　·　隔一根的微缺口 <b>23</b> 条<br>
+  · 对账键为 <b>(方向, 价位, 诞生序号)</b>：这 55 条里按「(方向, 价位) 唯一」只剩 <b>45</b> 个不同价位，
+  也就是有 10 条是同一价位被先后反复突破（第一批被套方打平离场后，新的一批又在该价位被套）。
+  只按 (方向, 价位) 对账会把这 55 折叠成 45 并掩盖这种重复。
+</div>
+
+<div class="ok">
+  <b>Zpa 01（趋势线 / 通道线 / 重要位 / 分段）已用同一份数据验证。</b><br>
+  <code>_context_ref.py::zpa01_eval</code> 是与 Pine <b>逐字同构</b>的参考实现 —— 同一套手工枢轴判定
+  （左侧允许相等、右侧严格小于）、同一套搜索顺序、同一套跨根状态。跑完 198 根后由 <code>check_invariants</code>
+  逐条检查结构性自洽：
+  <ul style="margin:8px 0 0 0;padding-left:20px">
+    <li><b>分段连续</b>：相邻段首尾相接（<code>段[k].last == 段[k+1].start − 1</code>），且覆盖首根到末根</li>
+    <li><b>斜率符号</b>：上涨趋势线的斜率必为正、下跌必为负</li>
+    <li><b>破位自洽</b>：破位当根的<b>收盘</b>必须在趋势线之外</li>
+    <li><b>重要低点</b>：其后的高点必须高于它（否则这条「推进起点」是假的）</li>
+    <li><b>过充事件</b>：事件起止与跨根状态位一致</li>
+  </ul>
+  全部通过。Pine 侧另用 <code>_lint_pine.py</code> 做静态自检（含 <b>10 类</b>语义陷阱），4 个文件 <b>0 硬伤</b>。<br>
+  本数据结果：趋势线 <b>1</b> 条（下跌）· 通道破位 <b>3</b> 次 · 过充 <b>4</b> 次（其中真过充 1）· 重要位 <b>4</b> 个 · 背景 <b>17</b> 段。<br>
+  <span style="color:#8a6d3b"><b>⚑ 修过的一处静默错误</b>：Pine 的 <code>[]</code> 只接受「<b>往回根数</b>」，
+  而本模块的取点用的一律是<b>绝对 K 线序号</b> —— 必须写 <code>high[bar_index - k]</code>。
+  写成 <code>high[k]</code> 会取到另一根 K 线（<b>不报错</b>）并在长图表上直接崩
+  （<code>Invalid number of bars back ... 0 and 10000</code>）。本文件里同时有 <b>3 处</b>，现已全部修正。</span>
+</div>
+
+<div class="note">
+  <b>一个必须知道的口径差异：ATR 不是同一个数。</b> CLI 与 Pine 算的 ATR <b>定义不同</b>，这不是 bug，别去「修」：
+  <table style="margin:10px 0 0">
+    <thead><tr><th style="width:38%">出处</th><th style="width:34%">定义</th><th>本数据（MNQ 5m）末根</th></tr></thead>
+    <tbody>
+      <tr><td><code>facts.json</code> / <code>market_facts.atr()</code></td><td>最近 14 根 TR 的<b>简单平均</b></td><td><b>6.270</b></td></tr>
+      <tr><td>Pine <code>ta.atr(14)</code></td><td><b>RMA / Wilder 平滑</b>（前 14 个用 SMA 播种，之后 α = 1/14）</td><td><b>7.198</b></td></tr>
+    </tbody>
+  </table>
+  <p style="margin:8px 0 0">差了约 0.93。所有以 ATR 为单位的容差参数（0.15 ATR 的破位容差、1.5 ATR 的重要位幅度、
+  2.5 ATR 的窄通道判据）<b>一律以 Pine 的 ATR 为准</b>；对照 CLI 报告里的 ATR 时记得两者不同源。</p>
+</div>
+<div class="note warn">
+  <b>旧口径是错的，已弃用。</b> 我第一版实现的是「相邻两根 K 线引线/实体不重叠」的<b>跳空</b>口径 —— 那是「空洞」，不是体系说的缺口。
+  在 MNQ 这类连续交易品种的 5 分钟图上，引线跳空实测 <b>0 条</b>，实体不重叠 <b>24 条</b>，两者都与体系无关。
+  换成体系口径后同一份数据检出 55 条缺口位。
+</div>
+<div class="note">
+  <b>另一个坑：渲染容量别去改口径。</b> 去重靠「该价位上是否已有未回补缺口」。如果这张表同时兼作「最多保留缺口数」的
+  裁剪表，裁掉一条<b>未回补</b>记录就等于<b>让出了那个价位</b>，之后会被重复检出。现在拆成两张表：
+  <b>未回补登记表</b>（口径来源，<b>不裁剪</b>；回补扫描与去重只扫它，成本与图表长度无关）
+  与 <b>绘图/历史表</b>（裁剪到 <code>最多保留缺口数</code>，只管画线与面板统计）。
+</div>
+<div class="note">
+  <b>与 CLI 事实层的口径差异（有意）</b>：<code>market_digest.detect_gaps</code> / <code>market_facts.detect_gaps</code>
+  用的仍是旧跳空口径，<code>reports/</code> 里既有报告的缺口数字也是按那个口径算的。
+  本次只修了 TradingView 指标，两层暂未统一 —— 对照报告与指标时请以本手册的口径说明为准。
+</div>
+
+<h2>五、快速上手</h2>
+<ol class="steps">
+  <li>TradingView 图表页 → 底部面板选择 <b>Pine 编辑器</b>。</li>
+  <li><b>打开 → 新建 → 空白 indicator 脚本</b>。</li>
+  <li>全选删除模板内容，粘贴某个 <code>.pine</code> 文件的<b>全部内容</b>。</li>
+  <li><code>Ctrl+S</code> 保存并命名，点「添加到图表」。</li>
+  <li>重复加载其余模块（可同时叠加在一张图上，建议面板位置错开）。</li>
+  <li>调参：指标名右侧 <code>⋯</code> → 设置 → 输入。</li>
+</ol>
+
+<div class="note">
+  <b>建议的看盘顺序</b>：先看 <b>01</b> 定背景（趋势还是震荡）→ 再看 <b>02 / 03</b> 找位（缺口与叠加位在哪）
+  → 最后看 <b>04</b> 等触发。这也正是体系「背景优先」的顺序。
+</div>
+
+<div class="note warn">
+  <b>报错 <code>CE10243 ... Your script has 2</code> 怎么修</b>
+  <p style="margin:8px 0 0">这条报错说的是「<b>编辑器里此刻有 2 条声明</b>」，不是文件里有 2 条 ——
+  四个源文件每个都只有 1 条 <code>indicator()</code>。TradingView 的编辑器<b>不会自动清空</b>，粘贴时旧内容会留下：</p>
+  <ul style="margin:8px 0 0 0;padding-left:20px">
+    <li><b>粘在模板下面</b>：<code>新建 → 空白 indicator</code> 自带 <code>indicator("My script")</code> 与 <code>plot(close)</code>，没删就粘了。</li>
+    <li><b>粘进已有标签页</b>：例如把 03 粘进了 01 的页签 → 编辑器里出现两套完整脚本、两个 <code>//@version=6</code>。</li>
+    <li><b>粘贴了两次</b>：同一份脚本出现两遍。</li>
+  </ul>
+  <p style="margin:8px 0 0"><b>通用修法</b>：编辑器内 <code>Ctrl+A</code>（Mac <code>Cmd+A</code>）全选 → <code>Delete</code> 清空 →
+  再粘贴单个 <code>.pine</code> 的<b>全文</b> → <code>Ctrl+S</code>。
+  <b>自检</b>：<code>Ctrl+F</code> 搜 <code>indicator(</code>，正确结果是<b>恰好 1 个命中</b>，且位于文件最顶部、<code>//@version=6</code> 之后。</p>
+  <p style="margin:8px 0 0"><b>防复发</b>：改动源码后跑一次静态自检，它会按官方三条规则
+  （恰好一条声明 / 全局作用域 / 版本注释唯一）校验：<br>
+  <code>python tradingview/_lint_pine.py tradingview/*.pine</code></p>
+</div>
+
+<h2>六、与 Zpa 工作流配合</h2>
+<table>
+<thead><tr><th style="width:22%">环节</th><th>做什么</th></tr></thead>
+<tbody>
+<tr><td>TradingView 指标</td><td>看盘、找位、等触发 —— 人工判断</td></tr>
+<tr><td>导出 OHLC</td><td>整理成 <code>zpa.market.v1</code> JSON（只含 meta / time / bars）</td></tr>
+<tr><td>CLI 事实层</td><td><code>market_digest.py</code> 校验 + 摘要；<code>market_facts.py</code> → <code>facts.json</code></td></tr>
+<tr><td>判断层</td><td><code>zpa-trading-analysis</code> → <code>analysis.json</code></td></tr>
+<tr><td>报告层</td><td><code>render_report.py</code> → 单文件 HTML 分析报告</td></tr>
+</tbody>
+</table>
+<p style="font-size:13.5px;color:var(--dim)">
+⚠ <b>指标与 CLI 的缺口口径目前不一致</b>（指标用体系口径、CLI 仍用旧的跳空口径，见第四节）。两边数出来的缺口数量会差很多，这是已知的、有意的差异 —— 以指标为准。另外注意 <code>meta.price.tickSize</code>：
+截图还原的数据常被写成 0.01，而标的真实最小变动可能是 0.25，会导致小缺口被错误保留或过滤。
+</p>
+
+<footer>
+  <b>免责</b>：本套指标是「Z说交易」体系的量化近似实现，用于把体系原文里的定性判断显性化，<b>不是交易系统，不产生买卖建议</b>。
+  任何信号都必须由人工在图上确认结构后自行决定是否执行。按该体系的分析推演，不构成投资建议。
+</footer>
+
+</div>
+</body>
+</html>
