@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZPA 判断向导 · ES 5 分钟</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --panel:#fff; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --line:#e2e8f0; --line2:#eef2f7;
+    --blue:#2563eb; --blue-bg:#eff6ff; --blue-bd:#bfdbfe; --blue-ink:#1e40af;
+    --green:#15803d; --green-bg:#f0fdf4; --green-bd:#86efac; --green-ink:#14532d;
+    --amber:#b45309; --amber-bg:#fffbeb; --amber-bd:#fcd34d; --amber-ink:#78350f;
+    --red:#b91c1c; --red-bg:#fef2f2; --red-bd:#fca5a5; --red-ink:#7f1d1d;
+    --slate:#475569; --slate-bg:#f8fafc; --slate-bd:#cbd5e1;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 10px 30px rgba(15,23,42,.07);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; flex-direction:column;
+    height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:20px;
+    padding:11px 22px; background:var(--panel); border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .brand h1{ font-size:14.5px; margin:0; font-weight:600; letter-spacing:.2px; }
+  .brand p{ font-size:11.5px; margin:2px 0 0; color:var(--muted); }
+  .tabs{ display:flex; gap:3px; background:#f1f5f9; padding:3px; border-radius:9px; }
+  .tab{
+    border:0; background:transparent; font:inherit; font-size:12.5px; color:var(--muted);
+    padding:6px 14px; border-radius:7px; cursor:pointer; transition:all .15s;
+  }
+  .tab:hover{ color:var(--ink); }
+  .tab.active{ background:#fff; color:var(--ink); font-weight:500; box-shadow:0 1px 2px rgba(15,23,42,.10); }
+
+  .workspace{ flex:1 1 auto; min-height:0; position:relative; overflow:hidden; }
+  .panel{ position:absolute; inset:0; display:none; }
+  .panel.active{ display:flex; }
+
+  /* ---------- 主舞台 ---------- */
+  .stage{
+    flex:1 1 auto; min-width:0; overflow-y:auto; padding:26px 24px 90px;
+    display:flex; flex-direction:column; align-items:center; justify-content:safe center;
+    overflow-x:hidden;
+  }
+  .crumb{
+    width:100%; max-width:660px; font-size:11.5px; color:var(--faint);
+    margin-bottom:12px; line-height:1.6; letter-spacing:.2px;
+  }
+  .crumb i{ font-style:normal; margin:0 5px; color:#cbd5e1; }
+
+  .cardwrap{ width:100%; max-width:660px; }
+  .cardwrap.fwd{ animation:inFwd .26s cubic-bezier(.22,.9,.32,1) both; }
+  .cardwrap.back{ animation:inBack .26s cubic-bezier(.22,.9,.32,1) both; }
+  @keyframes inFwd{ from{ opacity:0; transform:translateX(20px) } to{ opacity:1; transform:none } }
+  @keyframes inBack{ from{ opacity:0; transform:translateX(-20px) } to{ opacity:1; transform:none } }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:22px 22px 18px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--tone,var(--blue)); }
+  .card.t-blue{ --tone:#2563eb; }
+  .card.t-green{ --tone:#16a34a; }
+  .card.t-amber{ --tone:#d97706; }
+  .card.t-red{ --tone:#dc2626; }
+  .card.t-slate{ --tone:#94a3b8; }
+
+  .card-top{ display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .chip-kind{
+    font-size:10.5px; letter-spacing:.6px; color:var(--blue-ink); background:var(--blue-bg);
+    border:1px solid var(--blue-bd); border-radius:5px; padding:2px 7px;
+  }
+  .card.t-green .chip-kind{ color:var(--green-ink); background:var(--green-bg); border-color:var(--green-bd); }
+  .card.t-amber .chip-kind{ color:var(--amber-ink); background:var(--amber-bg); border-color:var(--amber-bd); }
+  .card.t-red .chip-kind{ color:var(--red-ink); background:var(--red-bg); border-color:var(--red-bd); }
+  .card.t-slate .chip-kind{ color:#334155; background:#f1f5f9; border-color:var(--slate-bd); }
+  .chip-flag{ font-size:10.5px; color:var(--muted); border:1px dashed var(--line); border-radius:5px; padding:2px 7px; }
+
+  .card-title{ font-size:20px; line-height:1.45; font-weight:600; margin:0 0 8px; letter-spacing:-.2px; }
+  .card-sub{ font-size:13px; line-height:1.75; color:var(--muted); margin:0 0 4px; }
+
+  .stance{
+    display:flex; gap:9px; align-items:flex-start; margin:16px 0 4px; padding:11px 13px;
+    border-radius:9px; font-size:12.5px; line-height:1.65;
+    background:var(--tone-bg,#f8fafc); color:#334155; border:1px solid var(--tone-bd,var(--line));
+  }
+  .card.t-green .stance{ background:var(--green-bg); border-color:var(--green-bd); }
+  .card.t-amber .stance{ background:var(--amber-bg); border-color:var(--amber-bd); }
+  .card.t-red .stance{ background:var(--red-bg); border-color:var(--red-bd); }
+  .stance b{ font-weight:600; color:var(--ink); }
+  .stance .ic{ font-size:13px; line-height:1.5; }
+
+  .sect{
+    font-size:11px; letter-spacing:.7px; color:var(--faint); font-weight:600;
+    margin:20px 0 8px; padding-top:16px; border-top:1px solid var(--line2);
+  }
+
+  /* ---------- 选项 ---------- */
+  .opts{ list-style:none; margin:0; padding:0; }
+  .opts li{ margin:0; }
+  .opt{
+    width:100%; display:flex; gap:11px; align-items:flex-start; text-align:left;
+    font:inherit; background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:12px 13px; margin-bottom:8px; cursor:pointer;
+    transition:border-color .15s, background .15s, transform .12s, box-shadow .15s;
+    animation:optIn .3s ease both;
+  }
+  @keyframes optIn{ from{ opacity:0; transform:translateY(6px) } to{ opacity:1; transform:none } }
+  .opt:hover{ border-color:var(--blue); background:#fafcff; transform:translateY(-1px); box-shadow:0 4px 14px rgba(37,99,235,.09); }
+  .opt:active{ transform:none; }
+  .opt:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+  .opt .k{
+    flex:0 0 auto; width:19px; height:19px; border-radius:5px; background:#f1f5f9; color:var(--muted);
+    font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; margin-top:1px;
+  }
+  .opt:hover .k{ background:var(--blue); color:#fff; }
+  .opt .txt{ flex:1 1 auto; min-width:0; }
+  .opt .main{ display:block; font-size:13.5px; line-height:1.6; color:var(--ink); }
+  .opt .note{ display:block; font-size:12px; line-height:1.6; color:var(--muted); margin-top:3px; }
+  .opt .go{
+    flex:0 0 auto; font-size:11.5px; color:var(--blue); align-self:center;
+    white-space:nowrap; opacity:.75; transition:opacity .15s;
+  }
+  .opt:hover .go{ opacity:1; }
+  .opt .go i{ font-style:normal; margin-left:3px; }
+
+  .opt.dec .w{ color:var(--red-ink); background:var(--red-bg); border:1px solid var(--red-bd); }
+  .opt.sup .w{ color:var(--amber-ink); background:var(--amber-bg); border:1px solid var(--amber-bd); }
+  .opt.none .w{ color:#334155; background:#f1f5f9; border:1px solid var(--slate-bd); }
+  .opt.dec:hover{ border-color:#f3a3a3; background:#fffbfb; }
+  .opt.sup:hover{ border-color:#f0c46a; background:#fffdf6; }
+  .w{
+    display:inline-block; font-size:10px; letter-spacing:.3px; font-weight:600;
+    border-radius:4px; padding:1px 5px; margin-right:7px; vertical-align:1px;
+  }
+
+  /* ---------- 出口按钮 ---------- */
+  .exits{ list-style:none; margin:0; padding:0; }
+  .exit{
+    display:block; width:100%; text-align:left; font:inherit; background:#fff;
+    border:1px solid var(--line); border-left-width:3px; border-radius:10px;
+    padding:12px 14px; margin-bottom:9px; cursor:pointer;
+    transition:border-color .15s, box-shadow .15s, transform .12s;
+    animation:optIn .3s ease both;
+  }
+  .exit:hover{ transform:translateY(-1px); box-shadow:0 5px 18px rgba(15,23,42,.07); border-color:#cbd5e1; }
+  .exit:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+  .exit.dec{ border-left-color:#dc2626; }
+  .exit.sup{ border-left-color:#d97706; }
+  .exit.none{ border-left-color:#cbd5e1; }
+  .exit.dec:hover{ border-color:#f3a3a3; border-left-color:#dc2626; }
+  .exit.sup:hover{ border-color:#f0c46a; border-left-color:#d97706; }
+  .ex-top{ display:flex; align-items:center; gap:8px; }
+  .ex-name{ font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.5; }
+  .ex-n{ margin-left:auto; font-size:11px; color:var(--faint); white-space:nowrap; }
+  .ex-desc{ display:block; font-size:12px; color:var(--muted); line-height:1.65; margin-top:5px; }
+  .ex-go{ display:inline-block; font-size:11.5px; color:var(--blue); margin-top:8px; }
+  .ex-go i{ font-style:normal; margin-left:3px; }
+
+  /* ---------- 说明折叠 ---------- */
+  .why{ margin-top:14px; border-top:1px solid var(--line2); padding-top:10px; }
+  .why summary{
+    font-size:11.5px; color:var(--faint); cursor:pointer; list-style:none;
+    display:inline-flex; align-items:center; gap:5px; user-select:none;
+  }
+  .why summary::-webkit-details-marker{ display:none; }
+  .why summary::before{ content:"?"; width:14px; height:14px; border-radius:50%; border:1px solid var(--line); font-size:9px; display:flex; align-items:center; justify-content:center; color:var(--faint); }
+  .why summary:hover{ color:var(--muted); }
+  .why p{ font-size:12.5px; line-height:1.8; color:#475569; margin:9px 0 0; padding-left:19px; }
+
+  .tips{ list-style:none; margin:12px 0 0; padding:0; }
+  .tips li{
+    font-size:12.5px; line-height:1.75; color:#334155; padding-left:15px; position:relative; margin-bottom:6px;
+  }
+  .tips li::before{ content:""; position:absolute; left:2px; top:9px; width:5px; height:5px; border-radius:50%; background:var(--tone,var(--blue)); opacity:.55; }
+
+  /* ---------- 卡片底栏 ---------- */
+  .card-bar{
+    display:flex; align-items:center; gap:8px; margin-top:14px;
+    width:100%; max-width:660px; font-size:12px;
+  }
+  .mini{
+    border:1px solid var(--line); background:#fff; color:var(--muted); font:inherit; font-size:12px;
+    padding:6px 11px; border-radius:7px; cursor:pointer; transition:all .15s;
+  }
+  .mini:hover{ color:var(--ink); border-color:var(--faint); background:#fafafa; }
+  .mini:disabled{ opacity:.4; cursor:default; }
+  .mini:disabled:hover{ color:var(--muted); border-color:var(--line); background:#fff; }
+  .spacer{ flex:1 1 auto; }
+  .toast{
+    font-size:11.5px; color:var(--green); opacity:0; transition:opacity .2s;
+  }
+  .toast.on{ opacity:1; }
+
+  /* ---------- 右侧栏 ---------- */
+  .rail{
+    flex:0 0 252px; border-left:1px solid var(--line); background:var(--panel);
+    padding:20px 18px; overflow-y:auto;
+  }
+  .rail h3{
+    font-size:10.5px; letter-spacing:.9px; color:var(--faint); font-weight:600;
+    margin:0 0 10px; text-transform:uppercase;
+  }
+  .rail .block + .block{ margin-top:26px; padding-top:20px; border-top:1px solid var(--line2); }
+  .map-item{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    font:inherit; font-size:12px; color:#334155; background:transparent; border:1px solid transparent;
+    border-radius:7px; padding:7px 8px; cursor:pointer; margin-bottom:2px; transition:all .14s;
+  }
+  .map-item:hover{ background:#f8fafc; }
+  .map-item .dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+  .map-item.g .dot{ background:#16a34a; } .map-item.a .dot{ background:#d97706; }
+  .map-item.r .dot{ background:#dc2626; } .map-item.s .dot{ background:#94a3b8; }
+  .map-item.on{ background:#f1f5f9; border-color:var(--line); font-weight:600; color:var(--ink); }
+
+  .trail{ list-style:none; margin:0; padding:0; }
+  .trail li{ position:relative; padding-left:16px; }
+  .trail li::before{
+    content:""; position:absolute; left:4px; top:15px; bottom:-2px; width:1px; background:var(--line);
+  }
+  .trail li:last-child::before{ display:none; }
+  .trail button{
+    display:block; width:100%; text-align:left; font:inherit; font-size:12px; line-height:1.5;
+    color:var(--muted); background:transparent; border:0; border-radius:6px; padding:5px 6px;
+    cursor:pointer; position:relative;
+  }
+  .trail button::before{
+    content:""; position:absolute; left:-12px; top:12px; width:5px; height:5px; border-radius:50%;
+    background:var(--line); z-index:1;
+  }
+  .trail button:hover{ background:#f8fafc; color:var(--ink); }
+  .trail li.cur button{ color:var(--ink); font-weight:600; }
+  .trail li.cur button::before{ background:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+  .trail .empty{ font-size:12px; color:var(--faint); padding-left:4px; }
+
+  .hintbox{
+    margin-top:14px; font-size:11.5px; line-height:1.7; color:var(--faint);
+    background:#f8fafc; border:1px solid var(--line2); border-radius:8px; padding:10px 11px;
+  }
+  .hintbox kbd{
+    font-family:inherit; font-size:10.5px; background:#fff; border:1px solid var(--line);
+    border-bottom-width:2px; border-radius:4px; padding:0 4px; color:var(--muted);
+  }
+
+  /* ---------- 文档类页面 ---------- */
+  .doc{ max-width:960px; margin:0 auto; padding:28px 24px 80px; width:100%; overflow-y:auto; }
+  .doc-head h2{ font-size:17px; margin:0 0 6px; }
+  .doc-head p{ font-size:12.5px; color:var(--muted); margin:0 0 22px; line-height:1.75; }
+  .card-static{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
+  .card-static + .card-static{ margin-top:14px; }
+  .card-static h3{ font-size:12px; margin:0 0 12px; color:var(--muted); font-weight:600; letter-spacing:.5px; }
+
+  /* 迁移表 */
+  .mrow{ display:grid; grid-template-columns:190px 1fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line2); }
+  .mrow:last-child{ border-bottom:0; padding-bottom:0; }
+  .mrow:first-child{ padding-top:0; }
+  .mstate{
+    font-size:12.5px; font-weight:600; border-radius:8px; padding:9px 11px; line-height:1.4; height:fit-content;
+    border:1px solid var(--line);
+  }
+  .mstate.g{ background:var(--green-bg); border-color:var(--green-bd); color:var(--green-ink); }
+  .mstate.a{ background:var(--amber-bg); border-color:var(--amber-bd); color:var(--amber-ink); }
+  .mstate.r{ background:var(--red-bg); border-color:var(--red-bd); color:var(--red-ink); }
+  .mstate.s{ background:#f1f5f9; border-color:var(--slate-bd); color:#334155; }
+  .mstate small{ display:block; font-weight:400; font-size:10.5px; opacity:.75; margin-top:2px; }
+  .medges{ display:flex; flex-direction:column; gap:7px; }
+  .mline{ display:flex; gap:8px; align-items:baseline; font-size:12.5px; line-height:1.6; color:#334155; flex-wrap:wrap; }
+  .mline .ev{ color:#475569; }
+  .mline .ar{ color:#cbd5e1; font-size:11px; }
+  .mline .to{ font-weight:600; color:var(--blue); cursor:pointer; border-bottom:1px dotted #c7d7f5; }
+  .mline .to:hover{ color:#1d4ed8; }
+  .mline.w-dec .ev::before{ content:"决定性 · "; font-size:10.5px; color:var(--red); }
+  .mline.w-sup .ev::before{ content:"辅助 · "; font-size:10.5px; color:var(--amber); }
+  .mline.w-none .ev::before{ content:"无变化 · "; font-size:10.5px; color:var(--faint); }
+
+  .principles{ display:grid; gap:12px; }
+  .pr{ display:flex; gap:11px; font-size:13px; line-height:1.75; color:#334155; }
+  .pr .n{
+    flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--blue-bg); color:var(--blue);
+    font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; margin-top:2px;
+  }
+  table.rec{ width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  table.rec th, table.rec td{ border:1px solid var(--line); padding:7px 9px; text-align:left; }
+  table.rec th{ background:#f8fafc; color:var(--muted); font-weight:600; font-size:11px; }
+
+  @media (max-width: 620px){
+    .opt{ flex-wrap:wrap; }
+    .opt .go{ width:100%; margin-top:6px; padding-left:30px; }
+    .ex-n{ display:none; }
+    .crumb{ display:none; }
+  }
+
+  @media (max-width: 940px){
+    header{ flex-wrap:wrap; padding:10px 14px; gap:10px; }
+    .tabs{ width:100%; }
+    .tab{ flex:1 1 auto; text-align:center; padding:6px 8px; }
+    .rail{ display:none; }
+    .stage{ padding:18px 14px 80px; }
+    .card{ padding:18px 16px 16px; }
+    .card-title{ font-size:18px; }
+    .mrow{ grid-template-columns:1fr; gap:8px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>ZPA 判断向导</h1>
+    <p>ES 5 分钟 · 每一步只看一个问题</p>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="guide">判断</button>
+    <button class="tab" data-tab="map">状态地图</button>
+    <button class="tab" data-tab="rule">判断原则</button>
+  </nav>
+</header>
+
+<div class="workspace">
+
+  <!-- 引导 -->
+  <section class="panel active" id="panel-guide">
+    <div class="stage">
+      <div class="crumb" id="crumb"></div>
+      <div class="cardwrap" id="cardWrap"></div>
+      <div class="card-bar">
+        <button class="mini" id="btnBack">← 上一步</button>
+        <button class="mini" id="btnRestart">重新开始</button>
+        <span class="spacer"></span>
+        <span class="toast" id="toast">已复制</span>
+        <button class="mini" id="btnCopy">复制本次结论</button>
+      </div>
+    </div>
+    <aside class="rail">
+      <div class="block">
+        <h3>状态地图</h3>
+        <div id="railMap"></div>
+      </div>
+      <div class="block">
+        <h3>走过的路</h3>
+        <ul class="trail" id="railTrail"></ul>
+        <div class="hintbox">
+          数字键 <kbd>1</kbd>–<kbd>9</kbd> 选择<br>
+          <kbd>←</kbd> 回退一步 · <kbd>R</kbd> 重来
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- 状态地图 -->
+  <section class="panel" id="panel-map">
+    <div class="doc">
+      <div class="doc-head">
+        <h2>五个状态，和它们之间唯一的通道</h2>
+        <p>这里不画完整流程图，只列状态机：每个状态现在是什么、什么条件下切换到哪。点右侧任一「去哪」可以直接跳到那一步。</p>
+      </div>
+      <div class="card-static" id="mapTable"></div>
+      <div class="card-static">
+        <h3>两个隐藏动作</h3>
+        <div class="principles">
+          <div class="pr"><span class="n">↺</span><span><b>改判不是跳到对面，而是回到结构扫描。</b>强趋势失效后更常见的下一步是宽通道或震荡，不是立刻反转。所有指向「回 ②」的箭头都是这个意思。</span></div>
+          <div class="pr"><span class="n">↓</span><span><b>单条只降级，两条才改判。</b>辅助证据一条只让「突破 / 窄通道」变成「趋势减弱」，第二条出现才按决定性处理。</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 判断原则 -->
+  <section class="panel" id="panel-rule">
+    <div class="doc">
+      <div class="doc-head">
+        <h2>判定时要知道的三条</h2>
+        <p>对应 ZPA.md 2.5「市场状态的切换与失效判定」。向导里的每个选项都是从这里拆出来的。</p>
+      </div>
+      <div class="card-static">
+        <div class="principles">
+          <div class="pr"><span class="n">1</span><span><b>单条线索只能降级，两条以上共振才能改判。</b>一根大阴线不构成改判理由，它只让「强趋势」变成「趋势减弱，继续观察」。</span></div>
+          <div class="pr"><span class="n">2</span><span><b>证据必须可以被否证。</b>说得出「什么情况出现，我就承认这条证据不成立」，才算证据；否则只是情绪。</span></div>
+          <div class="pr"><span class="n">3</span><span><b>改判的动作是回到 ② 重走一遍。</b>不是直接跳到对面的结论——震荡突破成功之后，仍要通过趋势质量检查，才能认定为趋势。</span></div>
+        </div>
+      </div>
+      <div class="card-static">
+        <h3>证据记录格式 · 每 5 根 K 线或每次关键事件记一行</h3>
+        <table class="rec">
+          <thead><tr><th>时间</th><th>观察到的证据</th><th>类别</th><th>原判断</th><th>新判断</th></tr></thead>
+          <tbody>
+            <tr><td>10:35</td><td>空头回补实体缺口后，3 根阳线未收复</td><td>A1</td><td>窄通道↑</td><td>回 ② 重判</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:12.5px;line-height:1.8;color:#475569;margin:14px 0 0">
+          <b>不改判的观察也要写下来。</b>否则复盘时回答不了「我当时为什么没看出来」——而这个问题的答案，通常就是漏记的那几条辅助证据。
+        </p>
+        <p style="font-size:12.5px;line-height:1.8;color:#475569;margin:10px 0 0">
+          一条纪律：持仓状态下不给自己改判的豁免权。持有多单时出现的 A1 证据，与空仓时看到的 A1 证据，权重必须相同。
+        </p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================
+   状态机数据
+   kind: q = 提问 · s = 状态 · n = 观察结论
+   ========================================================= */
+const FLOW = {};
+
+function Q(id, cfg){ FLOW[id] = Object.assign({ kind:'q', tone:'blue' }, cfg); }
+function S(id, cfg){ FLOW[id] = Object.assign({ kind:'s' }, cfg); }
+function N(id, cfg){ FLOW[id] = Object.assign({ kind:'n', tone:'slate' }, cfg); }
+
+/* ---------- 识别阶段 ---------- */
+
+Q('q1', {
+  label:'② 结构扫描',
+  tag:'② 结构扫描',
+  flag:'识别阶段',
+  title:'最近这一段，有没有明确的单方向推进？',
+  sub:'看一整段的高低点与波段，不看单根 K 线的强弱。',
+  why:'单方向推进 = 高低点持续推进、价格能突破左侧重要波段点。重叠较多、双向来回走的，直接进震荡支线。注意：这几根 K 线的强弱不算数，要看一整段。',
+  opts:[
+    { main:'有：高低点持续推进，能突破左侧重要波段点', note:'波段之间重叠少，回调浅', to:'q2', go:'检查趋势质量' },
+    { main:'没有：重叠较多，来回双向走', note:'顶部底部都被反复摸过，没有净推进', to:'q5', go:'进入震荡支线' }
+  ]
+});
+
+Q('q2', {
+  label:'③ 趋势质量',
+  tag:'③ 趋势质量',
+  flag:'识别阶段',
+  title:'顺势方是不是在持续推进？逆势方能不能赚到钱？',
+  sub:'整条路径里权重最高的一问。结构漂不漂亮，不如对手赚不赚钱。',
+  why:'逆势方能赚钱，说明双方优势正在接近。限价单在极值赚到钱，只说明有人愿意接；Stop 追进去还能赚，说明顺势方已经不敢防守——那是最强的信号。',
+  opts:[
+    { main:'顺势强，逆势方难赚钱', note:'逆势的单子大多被套，追也追不动', to:'q3', go:'看缺口与跟随' },
+    { main:'逆势方能赚到钱', note:'哪怕只是限价单在极值成交并获利', to:'q4', go:'看回调深度' }
+  ]
+});
+
+Q('q3', {
+  label:'③ 缺口与跟随',
+  tag:'③ 缺口与跟随',
+  flag:'识别阶段',
+  title:'缺口有没有保持敞开？顺势 K 线有没有连续跟随？',
+  sub:'缺口是趋势强度最直接的证据，比任何形态都可靠。',
+  why:'缺口保持敞开 + K 线连续跟随 = 突破或窄通道。缺口反复被回补，说明推动力不足，要退回弱趋势分支重新评估。',
+  opts:[
+    { main:'是：缺口敞开着，K 线连续跟随', note:'实体饱满，收盘靠向极值', to:'s_trend', go:'确认为强趋势' },
+    { main:'否：缺口反复被回补，跟随变差', note:'重叠 K、内包 K 开始增多', to:'q4', go:'退回弱趋势分支' }
+  ]
+});
+
+Q('q4', {
+  label:'③ 回调深度',
+  tag:'③ 回调深度',
+  flag:'识别阶段',
+  title:'回调是不是较深？逆势方用 Stop 入场能不能获利？',
+  sub:'这一问决定落在「宽通道」还是「趋势减弱」。',
+  why:'回调超过前一段的 50%、持续时间很长，且逆势方追进去也能赚 → 宽通道。回调浅、很快被买回 → 只是趋势减弱，继续观察。',
+  opts:[
+    { main:'是：回调较深，逆势方 Stop 入场也能获利', note:'回调超过前一段 50%，或持续超过 20 根 K 线', to:'s_channel', go:'判为宽通道' },
+    { main:'否：回调浅，很快被买回，逆势方赚不到', note:'推动力在下降，但方向还没翻', to:'s_weak', go:'判为趋势减弱' }
+  ]
+});
+
+Q('q5', {
+  label:'② 震荡支线',
+  tag:'② 震荡支线',
+  flag:'识别阶段',
+  title:'有没有出现明显的双向交易特征？',
+  sub:'上下边界各被测试两次以上，两个方向的缺口都被快速回补。',
+  why:'双向特征包括：边界反复被测试、价格反复回到波段起点、突破后没有跟随。证据不足时宁可进「趋势减弱」等待，不要硬下结论。',
+  opts:[
+    { main:'是：上下都在试探，边界逐渐清晰', note:'双向用限价单在极值都能赚', to:'q6', go:'区分 TTR 与普通区间' },
+    { main:'不确定：证据还不足', note:'宁可少做，也不猜', to:'s_weak', go:'进观察状态' }
+  ]
+});
+
+Q('q6', {
+  label:'② TTR 判定',
+  tag:'② TTR 判定',
+  flag:'识别阶段',
+  title:'是不是紧密震荡（TTR / 铁丝网）？',
+  sub:'K 线严重重叠，几乎每根都被前一根包含，没有连续推进。',
+  why:'TTR 与普通震荡的交易方式完全不同：前者停手等突破，后者在边界做反转。这个区分直接决定今天还做不做。',
+  opts:[
+    { main:'是：K 线重叠严重，几乎没有方向', note:'每根都被前一根包住，影线来回扫', to:'s_ttr', go:'停止交易' },
+    { main:'否：是普通震荡，边界清晰可做反转', note:'边界处有明确的反转 K 线', to:'s_range', go:'按区间交易' }
+  ]
+});
+
+/* ---------- 五个状态 ---------- */
+
+S('s_trend', {
+  label:'突破 / 窄通道',
+  mapClass:'g',
+  tone:'green',
+  title:'突破 / 窄通道',
+  tag:'市场状态',
+  sub:'缺口保持敞开、顺势 K 线连续跟随、逆势方难以获利。',
+  stance:'<b>可顺势持有</b> —— 唯一可以常规仓位顺势交易的状态。不要在回调里逆势抢反弹。',
+  sect:'接下来可能去哪',
+  exits:[
+    { w:'dec', to:'q1', name:'出现了决定性证据', desc:'逆向缺口敞开超 3 根 K 线 / 缺口被回补后 3 根无法收复 / 逆势方 Stop 入场也能赚', go:'回 ② 重判' },
+    { w:'sup', to:'s_weak', name:'只有辅助证据', desc:'回调变深、幅度递减、跟随变差、提前止盈', go:'降级为趋势减弱' },
+    { w:'none', to:'n_trend_ok', name:'一条都没有', desc:'缺口与跟随都还在，判断继续有效', go:'维持观察' }
+  ],
+  opts:[
+    { w:'dec', main:'逆势方制造出缺口，并保持敞开超过 3 根 K 线', note:'不是一根针式的插针，而是实体缺口持续存在', to:'q1', go:'回 ② 重判' },
+    { w:'dec', main:'逆势方回补实体缺口后，顺势方连续 3 根以上无法收复', note:'这个位置已经从支撑变成阻力', to:'q1', go:'回 ② 重判' },
+    { w:'dec', main:'逆势方用 Stop 入场也能持续获利', note:'最强的一条。限价捡针只说明有人接，Stop 追进去还能赚说明对手不敢防守', to:'q1', go:'回 ② 重判' },
+    { w:'sup', main:'回调超过前一段的 50%，或持续超过 20 根 K 线', to:'s_weak', go:'降级为趋势减弱' },
+    { w:'sup', main:'新高 / 新低幅度递减（10 点 → 5 点 → 2 点）', to:'s_weak', go:'降级为趋势减弱' },
+    { w:'sup', main:'顺势 K 线跟随变差，重叠 K、内包 K 增多', to:'s_weak', go:'降级为趋势减弱' },
+    { w:'sup', main:'顺势方在重要前高前低提前止盈，未到测量目标就回撤', to:'s_weak', go:'降级为趋势减弱' },
+    { w:'none', main:'都没有，缺口与跟随都还在', note:'保持判断，但不要停止记录', to:'n_trend_ok', go:'维持观察' }
+  ],
+  why:'对应 ZPA.md 6.5 与 2.5-A。决定性证据任一条成立即改判；只有辅助证据时只降级，累计两条以上才按决定性处理。'
+});
+
+S('s_channel', {
+  label:'宽通道 / 倾斜震荡',
+  mapClass:'a',
+  tone:'amber',
+  title:'宽通道 / 倾斜震荡',
+  tag:'市场状态',
+  sub:'通道内仍有方向，但回调更深，逆势方也能获利。',
+  stance:'<b>可以做，但要降预期</b> —— 止损放宽、仓位下调，尤其别在通道上沿追多。',
+  sect:'接下来可能去哪',
+  exits:[
+    { w:'dec', to:'q1', name:'出现反转证据', desc:'MTR 四件套齐备 / 更低高点 + 更低低点，且反攻无力', go:'回 ② 重判' },
+    { w:'dec', to:'q5', name:'出现双向证据', desc:'双向缺口快速回补 / 边界各测 ≥2 次 / 双向 Stop 都能赚', go:'转震荡' },
+    { w:'none', to:'n_channel_ok', name:'都没有', desc:'回调依然被买回 / 卖回，通道边界依然有效', go:'保持宽通道' }
+  ],
+  opts:[
+    { w:'dec', main:'MTR 四件套齐备：趋势线被有效突破 + EMA20 均线缺口 K + 回测原极值失败 + 双顶/双底', note:'四项同时出现，视为反转开始', to:'q1', go:'回 ② 重判' },
+    { w:'dec', main:'结构方向已反向确立：更低高点 + 更低低点，且反攻无力', to:'q1', go:'回 ② 重判' },
+    { w:'dec', main:'上下方向的缺口都被快速回补，价格长时间滞留通道中部', note:'通道已经失去方向性，实质是震荡', to:'q5', go:'转震荡' },
+    { w:'dec', main:'上下边界各被测试 ≥2 次，每次都出现有效反转 K 线', to:'q5', go:'转震荡' },
+    { w:'dec', main:'双向用 Stop 入场都能获利，而不只是限价单能赚', note:'这是双向环境的直接证据', to:'q5', go:'转震荡' },
+    { w:'none', main:'回调依然被买回 / 卖回，通道边界依然有效', to:'n_channel_ok', go:'保持宽通道' }
+  ],
+  why:'对应 ZPA.md 2.5-B。宽通道只有两条演化路径：反转（MTR 成立）或转成震荡。没有第三条——它不会自己原地变强。'
+});
+
+S('s_range', {
+  label:'普通震荡区间',
+  mapClass:'a',
+  tone:'amber',
+  title:'普通震荡区间',
+  tag:'市场状态',
+  sub:'双向交易环境，边界相对清晰。',
+  stance:'<b>在边界附近做反转</b> —— 不在中间进场。观察顶部、底部，以及突破失败后的回落。',
+  sect:'接下来可能去哪',
+  exits:[
+    { w:'dec', to:'q1', name:'区间被有效离开', desc:'离开边界 + 获得跟随 + 缺口保持敞开', go:'回 ② 重判' },
+    { w:'dec', to:'n_range_hold', name:'突破失败，区间延续', desc:'返回区间并出现双顶 / 双底 / 楔形 / 外包 K', go:'维持区间' },
+    { w:'dec', to:'n_range_widen', name:'边界被拓宽', desc:'双向特征依然完整，只更新边界坐标', go:'更新坐标' },
+    { w:'none', to:'n_range_hold', name:'仍在区间内测试边界', desc:'没有离开，也没有走出反向结构', go:'维持区间' }
+  ],
+  opts:[
+    { w:'dec', main:'价格离开边界并获得跟随，缺口保持敞开', note:'离开 + 跟随 + 缺口敞开，三个条件同时满足才算', to:'q1', go:'回 ② 重判' },
+    { w:'dec', main:'突破失败返回区间，并出现反向结构：双顶、双底、楔形、外包 K', note:'区间延续，仍然有效', to:'n_range_hold', go:'区间延续' },
+    { w:'dec', main:'边界被拓宽，但双向特征依然完整', note:'只更新边界坐标，不改变类别', to:'n_range_widen', go:'更新坐标' },
+    { w:'none', main:'仍在区间内测试边界，没有离开', to:'n_range_hold', go:'维持区间' }
+  ],
+  why:'对应 ZPA.md 2.5-D。注意：边界被拓宽不是类别改变，别把「区间变大了」误读成「趋势要来了」。'
+});
+
+S('s_ttr', {
+  label:'紧密震荡 TTR',
+  mapClass:'r',
+  tone:'red',
+  title:'紧密震荡（TTR）',
+  tag:'市场状态',
+  sub:'K 线严重重叠，没有方向性推进。',
+  stance:'<b>停止交易</b> —— 做多做空都容易被扫。正确动作是等突破，再用跟随情况判真假。',
+  sect:'接下来可能去哪',
+  exits:[
+    { w:'dec', to:'q1', name:'突破有效', desc:'2–3 根趋势 K + 缺口不回补 + 回踩不重新进入区间', go:'重判' },
+    { w:'dec', to:'n_fake', name:'假突破', desc:'1–2 根内回到区间，且没有跟随', go:'仍是 TTR' },
+    { w:'none', to:'n_ttr_wait', name:'仍在区间内', desc:'没有突破，继续等', go:'不做' }
+  ],
+  opts:[
+    { w:'dec', main:'突破后连续 2–3 根趋势 K，实体饱满、收盘靠近极值', note:'同时缺口不回补、回踩没有重新进入区间内部', to:'q1', go:'有效突破，重判' },
+    { w:'dec', main:'突破后 1–2 根 K 线内回到区间，且没有跟随', note:'假突破，仍然是 TTR', to:'n_fake', go:'仍是 TTR' },
+    { w:'none', main:'仍在区间内，没有突破', to:'n_ttr_wait', go:'继续等' }
+  ],
+  why:'对应 ZPA.md 2.3 与 2.5-C。特别注意第二段陷阱：<b>第二次突破看起来更强，不等于会成功</b>。不要因为突破力度大就改判。'
+});
+
+S('s_weak', {
+  label:'趋势减弱，观察中',
+  mapClass:'s',
+  tone:'slate',
+  title:'趋势减弱，继续观察',
+  tag:'市场状态',
+  sub:'这是一个等待状态，本身没有方向。',
+  stance:'<b>仓位压到最小，不反向</b> —— 它不该长期停留，只有两个出口。',
+  sect:'接下来可能去哪',
+  exits:[
+    { w:'dec', to:'q1', name:'回到趋势，或第二条辅助证据', desc:'顺势方重新制造并保持缺口、回调变浅；或再出现一条辅助证据（累计两条）', go:'回 ② 重判' },
+    { w:'dec', to:'q5', name:'双向边界确立', desc:'顶底各测 ≥2 次，两个方向的 Stop 都能获利', go:'转震荡' },
+    { w:'none', to:'s_range', name:'超时，仍无出口', desc:'超过 20 根 K 线没有方向', go:'按震荡处理' }
+  ],
+  opts:[
+    { w:'dec', main:'顺势方重新制造缺口并保持敞开，回调变浅，逆势方再次难以获利', note:'重回趋势，回 ② 确认', to:'q1', go:'回趋势' },
+    { w:'dec', main:'双向边界确立：顶底各被测试 ≥2 次，且双向 Stop 都能获利', note:'转震荡的直接证据', to:'q5', go:'转震荡' },
+    { w:'dec', main:'又出现了一条辅助证据（累计两条）', note:'单条只降级，两条共振按决定性处理', to:'q1', go:'回 ② 重判' },
+    { w:'none', main:'超过 20 根 K 线仍无出口', note:'超过时限，按震荡或 TTR 处理并空仓', to:'s_range', go:'按震荡处理' }
+  ],
+  why:'对应 ZPA.md 2.5-E。这个状态的作用是被动等待，出口只有两个：回到趋势，或者转成震荡。'
+});
+
+/* ---------- 观察结论 ---------- */
+
+N('n_trend_ok', {
+  label:'维持 · 仍为强趋势', tag:'观察', title:'维持：判断继续有效',
+  sub:'没有任何失效证据出现。保持原判断。',
+  tips:['不要停止记录。<b>没有改判的观察也要写下来</b>，否则复盘时回答不了「我当时为什么没看出来」。','每 5 根 K 线或每次关键事件记一行：证据、类别、原判断、新判断。'],
+  back:'s_trend'
+});
+
+N('n_channel_ok', {
+  label:'维持 · 仍为宽通道', tag:'观察', title:'维持：通道边界仍然有效',
+  sub:'回调依然被买回 / 卖回，没有走到反转或震荡。',
+  tips:['宽通道的默认动作是「减预期继续做」，不是空仓也不是加仓。','盯住两件事：MTR 是否开始成形，双向缺口是否都被快速回补。'],
+  back:'s_channel'
+});
+
+N('n_range_hold', {
+  label:'区间延续', tag:'观察', title:'区间延续，类别不变',
+  sub:'突破失败并返回区间，出现反向结构。区间仍然有效。',
+  tips:['继续在边界做反转，不在中间进场。','如果出现双顶/双底/楔形/外包 K，说明边界处有明确的对手盘，可提高该边界的权重。'],
+  back:'s_range'
+});
+
+N('n_range_widen', {
+  label:'更新边界坐标', tag:'观察', title:'只更新坐标，不改类别',
+  sub:'边界被拓宽，但双向特征依然完整。',
+  tips:['把新的高低点记进坐标里，其余判断不动。','警惕一种误读：区间变大不等于趋势要来了。'],
+  back:'s_range'
+});
+
+N('n_ttr_wait', {
+  label:'等突破', tag:'观察', title:'继续等，不做',
+  sub:'仍在区间内，没有突破。TTR 里的正确动作是不交易。',
+  tips:['等的是「离开区间 + 跟随 + 缺口敞开」，不是「有一根大 K 线」。','记录每一根接近边界的 K 线，突破那天你会需要这些前情。'],
+  back:'s_ttr'
+});
+
+N('n_fake', {
+  label:'假突破 · 仍是 TTR', tag:'观察', title:'假突破，仍按 TTR 处理',
+  sub:'突破后 1–2 根就回到区间，且没有跟随。',
+  tips:['<b>第二段陷阱：第二次突破看起来更强，不等于会成功。</b>仍以「是否真正离开区间 + 有无跟随」为准。','假突破之后往往跟随一次方向相反的真突破，但不要提前埋伏，等它自己走出来。'],
+  back:'s_ttr'
+});
+
+/* note 卡自动补一个返回选项 */
+Object.keys(FLOW).forEach(id => {
+  const nd = FLOW[id];
+  if (nd.kind !== 'n') return;
+  nd.sect = '下一步';
+  nd.opts = [
+    { main:'继续观察，保持当前判断', note:'回到「' + FLOW[nd.back].title + '」', to:nd.back, go:'返回' },
+    { main:'重新扫一遍结构，从头判断', note:'市场已经变了，旧判断不再适用', to:'q1', go:'回 ② 重判' }
+  ];
+});
+
+/* =========================================================
+   把状态卡的「出路」展开成子卡：
+   同一条出路下超过 1 条证据时，先问「是哪一条」；
+   只有 1 条证据时，直接跳到目标，不再多一次点击。
+   ========================================================= */
+function buildExits(){
+  const ids = Object.keys(FLOW).filter(id => FLOW[id].kind === 's' && FLOW[id].exits);
+  ids.forEach(id => {
+    const nd = FLOW[id];
+    nd.exitCards = nd.exits.map(ex => {
+      const items = nd.opts.filter(o => (o.w || 'none') === ex.w && o.to === ex.to);
+      const base = { w:ex.w, name:ex.name, desc:ex.desc, to:ex.to, go:ex.go, goalLabel:FLOW[ex.to].label };
+      if (items.length <= 1) return Object.assign(base, { direct:true });
+
+      const cid = id + '__' + ex.w + '__' + ex.to;
+      FLOW[cid] = {
+        kind:'e', tone:nd.tone, label:ex.name, tag:'核对证据',
+        title: ex.w === 'dec' ? '哪一条决定性证据成立？'
+             : ex.w === 'sup' ? '哪一条辅助证据成立？'
+             : '确认：真的都没有？',
+        sub: ex.w === 'dec' ? '任一条成立即可改判。一条都不确定时，不要在这里硬下结论。'
+           : ex.w === 'sup' ? '单条只能降级。出现两条以上共振，才按决定性处理。'
+           : '保持原判断，但不要停止记录。',
+        opts: items.map(it => ({ main:it.main, note:it.note, to:ex.to, go: it.go || ex.go })),
+        why: nd.why
+      };
+      return Object.assign(base, { to:cid, count:items.length });
+    });
+  });
+}
+buildExits();
+
+/* =========================================================
+   导航状态
+   ========================================================= */
+const START = 'q1';
+let trail = [START];
+let pos = 0;
+
+const cardWrap = document.getElementById('cardWrap');
+const crumbEl  = document.getElementById('crumb');
+const railEl   = document.getElementById('railMap');
+const trailEl  = document.getElementById('railTrail');
+const toastEl  = document.getElementById('toast');
+
+const TONE_CLASS = { blue:'t-blue', green:'t-green', amber:'t-amber', red:'t-red', slate:'t-slate' };
+
+function optHTML(o, i){
+  const num = i + 1;
+  let badge = '';
+  let cls = '';
+  if (o.w === 'dec'){ badge = '<span class="w">决定性</span>'; cls = ' dec'; }
+  else if (o.w === 'sup'){ badge = '<span class="w">辅助</span>'; cls = ' sup'; }
+  else if (o.w === 'none'){ badge = '<span class="w">无变化</span>'; cls = ' none'; }
+  return '<li><button class="opt' + cls + '" data-to="' + o.to + '" style="animation-delay:' + (i * 22) + 'ms">' +
+    '<span class="k">' + num + '</span>' +
+    '<span class="txt"><span class="main">' + badge + o.main + '</span>' +
+      (o.note ? '<span class="note">' + o.note + '</span>' : '') +
+    '</span>' +
+    (o.go ? '<span class="go">' + o.go + '<i>→</i></span>' : '') +
+  '</button></li>';
+}
+
+function exitHTML(ex, i){
+  const cls = ex.w === 'dec' ? 'dec' : ex.w === 'sup' ? 'sup' : 'none';
+  const wl  = ex.w === 'dec' ? '决定性' : ex.w === 'sup' ? '辅助' : '无变化';
+  const tail = ex.count ? ex.count + ' 条' : '直接前往';
+  return '<li><button class="exit ' + cls + '" data-to="' + ex.to + '" style="animation-delay:' + (i * 30) + 'ms">' +
+    '<span class="ex-top"><span class="w">' + wl + '</span>' +
+      '<span class="ex-name">' + ex.name + '</span>' +
+      '<span class="ex-n">' + tail + '</span></span>' +
+    '<span class="ex-desc">' + ex.desc + '</span>' +
+    '<span class="ex-go">' + ex.goalLabel + '<i>→</i></span>' +
+  '</button></li>';
+}
+
+function render(id, dir){
+  const nd = FLOW[id];
+  const isState = nd.kind === 's';
+
+  let html = '<div class="card ' + (TONE_CLASS[nd.tone] || 't-blue') + '">';
+  html += '<div class="card-top">';
+  if (isState){
+    html += '<span class="chip-kind">市场状态</span><span class="chip-flag">持续监控中</span>';
+  } else if (nd.kind === 'e'){
+    const prevLabel = trail[pos - 1] ? FLOW[trail[pos - 1]].label : '来自状态卡';
+    html += '<span class="chip-kind">核对证据</span><span class="chip-flag">' + prevLabel + '</span>';
+  } else if (nd.kind === 'n'){
+    html += '<span class="chip-kind">观察结论</span>';
+  } else {
+    html += '<span class="chip-kind">' + nd.tag + '</span><span class="chip-flag">' + nd.flag + '</span>';
+  }
+  html += '</div>';
+
+  html += '<h2 class="card-title">' + nd.title + '</h2>';
+  if (nd.sub) html += '<p class="card-sub">' + nd.sub + '</p>';
+  if (nd.stance) html += '<div class="stance"><span class="ic">▸</span><span>' + nd.stance + '</span></div>';
+  if (nd.tips){
+    html += '<ul class="tips">' + nd.tips.map(t => '<li>' + t + '</li>').join('') + '</ul>';
+  }
+
+  if (isState && nd.exitCards){
+    html += '<div class="sect">' + nd.sect + '</div>';
+    html += '<ul class="exits">' + nd.exitCards.map((ex, i) => exitHTML(ex, i)).join('') + '</ul>';
+  } else {
+    html += '<div class="sect">' + (nd.sect || '选择最接近你看到的情况') + '</div>';
+    html += '<ul class="opts">' + nd.opts.map((o, i) => optHTML(o, i)).join('') + '</ul>';
+  }
+
+  if (nd.why){
+    html += '<details class="why"><summary>这一步的依据</summary><p>' + nd.why + '</p></details>';
+  }
+  html += '</div>';
+
+  cardWrap.innerHTML = html;
+  cardWrap.classList.remove('fwd', 'back');
+  void cardWrap.offsetWidth;
+  cardWrap.classList.add(dir < 0 ? 'back' : 'fwd');
+
+  cardWrap.querySelectorAll('[data-to]').forEach(b => {
+    b.addEventListener('click', () => go(b.dataset.to));
+  });
+
+  renderCrumb(id);
+  renderRail(id);
+  document.getElementById('btnBack').disabled = (pos === 0);
+  document.querySelector('.stage').scrollTo({ top:0, behavior:'smooth' });
+}
+
+function renderCrumb(id){
+  const prev = trail.slice(0, pos).map(t => FLOW[t].label);
+  let s = '<span style="color:#94a3b8">起点</span>';
+  prev.forEach(p => { s += '<i>›</i>' + p; });
+  s += '<i>›</i><b style="color:#475569;font-weight:600">' + FLOW[id].label + '</b>';
+  crumbEl.innerHTML = s;
+}
+
+function renderRail(id){
+  const MAP = ['s_trend','s_channel','s_range','s_ttr','s_weak'];
+  const base = FLOW[id].kind === 'e' ? id.split('__')[0] : id;
+  railEl.innerHTML = MAP.map(k => {
+    const n = FLOW[k];
+    return '<button class="map-item ' + n.mapClass + (k === base ? ' on' : '') + '" data-jump="' + k + '">' +
+      '<span class="dot"></span>' + n.label + '</button>';
+  }).join('');
+  railEl.querySelectorAll('[data-jump]').forEach(b => {
+    b.addEventListener('click', () => go(b.dataset.jump));
+  });
+
+  trailEl.innerHTML = trail.map((t, i) =>
+    '<li class="' + (i === pos ? 'cur' : '') + '"><button data-i="' + i + '">' + FLOW[t].label + '</button></li>'
+  ).join('');
+  trailEl.querySelectorAll('[data-i]').forEach(b => {
+    b.addEventListener('click', () => {
+      const i = +b.dataset.i;
+      if (i === pos) return;
+      const dir = i < pos ? -1 : 1;
+      pos = i;
+      trail = trail.slice(0, i + 1);
+      render(trail[i], dir);
+    });
+  });
+}
+
+function go(to){
+  if (!FLOW[to]) return;
+  trail = trail.slice(0, pos + 1);
+  trail.push(to);
+  pos = trail.length - 1;
+  render(to, 1);
+}
+
+function back(){
+  if (pos === 0) return;
+  pos -= 1;
+  trail = trail.slice(0, pos + 1);
+  render(trail[pos], -1);
+}
+
+function restart(){
+  trail = [START];
+  pos = 0;
+  render(START, -1);
+}
+
+/* =========================================================
+   交互
+   ========================================================= */
+document.getElementById('btnBack').addEventListener('click', back);
+document.getElementById('btnRestart').addEventListener('click', restart);
+document.getElementById('btnCopy').addEventListener('click', copySummary);
+
+function flash(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  setTimeout(() => toastEl.classList.remove('on'), 1400);
+}
+
+function pad(n){ return n < 10 ? '0' + n : '' + n; }
+
+function copySummary(){
+  const d = new Date();
+  const time = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const path = trail.slice(0, pos + 1).map(t => FLOW[t].label).join(' › ');
+  const cur = FLOW[trail[pos]];
+  const text = 'ZPA 判断 ' + time + '\n' +
+               '路径：' + path + '\n' +
+               '当前：' + cur.title + (cur.stance ? '\n动作：' + cur.stance.replace(/<[^>]+>/g, '') : '');
+  const done = () => flash('已复制');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch(e){ flash('复制失败'); }
+  document.body.removeChild(ta);
+}
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('panel-guide').classList.contains('active')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key >= '1' && e.key <= '9'){
+    const btns = cardWrap.querySelectorAll('[data-to]');
+    const i = +e.key - 1;
+    if (btns[i]){ e.preventDefault(); btns[i].click(); }
+    return;
+  }
+  if (e.key === 'Backspace' || e.key === 'ArrowLeft'){ e.preventDefault(); back(); return; }
+  if (e.key === 'r' || e.key === 'R'){ restart(); }
+});
+
+/* =========================================================
+   Tab 切换
+   ========================================================= */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+}
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+/* =========================================================
+   状态地图（迁移表）
+   ========================================================= */
+const MAP_ORDER = ['s_trend','s_channel','s_range','s_ttr','s_weak'];
+
+function buildMap(){
+  const el = document.getElementById('mapTable');
+  let html = '<h3>状态迁移表 · 点「去哪」可直接跳到那一步</h3>';
+  MAP_ORDER.forEach(k => {
+    const n = FLOW[k];
+    html += '<div class="mrow">' +
+      '<div class="mstate ' + n.mapClass + '">' + n.label + '<small>' + n.sub + '</small></div>' +
+      '<div class="medges">' +
+        n.opts.map(o => {
+          const cls = o.w === 'dec' ? 'w-dec' : o.w === 'sup' ? 'w-sup' : 'w-none';
+          return '<div class="mline ' + cls + '">' +
+            '<span class="ev">' + o.main + '</span>' +
+            '<span class="ar">→</span>' +
+            '<span class="to" data-jump="' + o.to + '">' + FLOW[o.to].label + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  });
+  el.innerHTML = html;
+  el.querySelectorAll('[data-jump]').forEach(b => {
+    b.addEventListener('click', () => {
+      go(b.dataset.jump);
+      switchTab('guide');
+    });
+  });
+}
+
+/* =========================================================
+   初始化
+   ========================================================= */
+buildMap();
+
+/* 支持用 #s_trend 这样的锚点直接打开某个状态（便于分享/书签） */
+(() => {
+  const h = decodeURIComponent((location.hash || '').replace('#', ''));
+  if (h === 'map' || h === 'rule'){ switchTab(h); return; }
+  if (h && FLOW[h]){ trail = [h]; pos = 0; }
+})();
+
+render(trail[pos], 1);
+</script>
+</body>
+</html>

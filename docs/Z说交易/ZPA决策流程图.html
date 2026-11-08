@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZPA 决策流程图 · ES 5 分钟</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --faint: #94a3b8;
+    --line: #cbd5e1;
+    --blue: #2563eb;
+    --blue-bg: #eff6ff;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --slate-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 12px 22px;
+    background: var(--panel);
+    border-bottom: 1px solid #e2e8f0;
+    flex: 0 0 auto;
+  }
+  .brand h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .brand p { font-size: 12px; margin: 3px 0 0; color: var(--muted); }
+  .tabs { display: flex; gap: 4px; background: var(--slate-bg); padding: 3px; border-radius: 9px; }
+  .tab {
+    border: 0; background: transparent; font: inherit; font-size: 12.5px;
+    color: var(--muted); padding: 6px 14px; border-radius: 7px; cursor: pointer;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(15,23,42,.10); font-weight: 500; }
+
+  /* ---------- 工作区 ---------- */
+  .workspace { flex: 1 1 auto; min-height: 0; position: relative; }
+  .panel { position: absolute; inset: 0; display: none; }
+  .panel.active { display: flex; }
+
+  /* ---------- 流程图 ---------- */
+  .scroll {
+    flex: 1 1 auto; overflow: auto; padding: 28px 20px 60px;
+    background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .canvas { position: relative; margin: 0 auto; }
+  #edges { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; overflow: visible; }
+  .node {
+    position: absolute;
+    width: 196px;
+    min-height: 58px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: box-shadow .15s, transform .15s, border-color .15s;
+  }
+  .node:hover { box-shadow: 0 4px 14px rgba(15,23,42,.10); transform: translateY(-1px); border-color: var(--blue); }
+  .node.selected { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.16); }
+  .node.dim { opacity: .42; }
+  .node-title { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+  .node-sub { font-size: 11px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
+
+  .node.start { background: var(--blue-bg); border-color: #93c5fd; }
+  .node.decision { background: var(--blue-bg); border-color: #bfdbfe; }
+  .node.decision .node-title { color: #1e3a8a; }
+  .node.state-green { background: var(--green-bg); border-color: #86efac; }
+  .node.state-green .node-title { color: #14532d; }
+  .node.state-amber { background: var(--amber-bg); border-color: #fcd34d; }
+  .node.state-amber .node-title { color: #78350f; }
+  .node.state-red { background: var(--red-bg); border-color: #fca5a5; }
+  .node.state-red .node-title { color: #7f1d1d; }
+  .node.state-slate { background: var(--slate-bg); border-color: #cbd5e1; }
+  .node.tag::after {
+    content: attr(data-tag);
+    position: absolute; top: -8px; right: 8px;
+    font-size: 9.5px; letter-spacing: .4px; color: #fff;
+    background: var(--blue); border-radius: 4px; padding: 1px 5px;
+  }
+  .node.state-green.tag::after { background: var(--green); }
+  .node.state-amber.tag::after { background: var(--amber); }
+  .node.state-red.tag::after { background: var(--red); }
+
+  .edge { fill: none; stroke: #94a3b8; stroke-width: 1.6; transition: opacity .15s, stroke-width .15s; }
+  .edge.yes { stroke: #16a34a; }
+  .edge.no { stroke: #dc2626; }
+  .edge.doubt { stroke: #d97706; stroke-dasharray: 5 4; }
+  .edge.back { stroke: #7c3aed; stroke-dasharray: 6 4; }
+  .edge.hl { stroke-width: 2.6; }
+  .edge.dim { opacity: .18; }
+  .edge-label {
+    font-size: 10.5px; fill: #475569;
+    paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;
+  }
+  .arrow { fill: #94a3b8; }
+  .arrow.yes { fill: #16a34a; }
+  .arrow.no { fill: #dc2626; }
+  .arrow.doubt { fill: #d97706; }
+  .arrow.back { fill: #7c3aed; }
+
+  /* ---------- 右侧详情 ---------- */
+  aside {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 336px; z-index: 6;
+    background: var(--panel);
+    border-left: 1px solid #e2e8f0;
+    box-shadow: -10px 0 28px rgba(15,23,42,.07);
+    padding: 22px 20px;
+    overflow-y: auto;
+    transform: translateX(102%);
+    transition: transform .22s ease;
+  }
+  aside.open { transform: translateX(0); }
+  .close-insp {
+    position: absolute; top: 10px; right: 12px;
+    border: 0; background: transparent; color: var(--faint);
+    font-size: 16px; line-height: 1; cursor: pointer; padding: 4px 7px; border-radius: 6px;
+  }
+  .close-insp:hover { background: var(--slate-bg); color: var(--ink); }
+  aside h2 { font-size: 13px; margin: 0 0 4px; font-weight: 600; }
+  aside .hint { font-size: 12px; color: var(--muted); line-height: 1.65; }
+  aside .block { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eef2f7; }
+  .tagline { display: inline-block; font-size: 10.5px; color: var(--blue); background: var(--blue-bg); border-radius: 5px; padding: 2px 7px; margin-bottom: 8px; }
+  .detail-title { font-size: 13.5px; font-weight: 600; line-height: 1.5; }
+  .detail-body { font-size: 12.5px; color: #334155; line-height: 1.75; margin-top: 8px; }
+  .detail-body ul { margin: 8px 0 0; padding-left: 16px; }
+  .detail-body li { margin-bottom: 5px; }
+  .btn {
+    display: inline-block; margin-top: 14px; border: 1px solid var(--blue); color: var(--blue);
+    background: #fff; font: inherit; font-size: 12px; padding: 7px 13px; border-radius: 7px; cursor: pointer;
+  }
+  .btn:hover { background: var(--blue-bg); }
+  kbd { font-family: inherit; font-size: 11px; background: var(--slate-bg); border: 1px solid #e2e8f0; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+
+  /* ---------- 判定面板 ---------- */
+  #panel-judge { overflow-y: auto; display: none; }
+  #panel-judge.active { display: block; }
+  .judge { max-width: 1060px; margin: 0 auto; padding: 26px 24px 80px; }
+  .judge-head h2 { font-size: 17px; margin: 0 0 6px; }
+  .judge-head p { font-size: 12.5px; color: var(--muted); margin: 0 0 20px; line-height: 1.7; }
+  .state-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .chip {
+    border: 1px solid var(--line); background: #fff; font: inherit; font-size: 12.5px;
+    padding: 8px 15px; border-radius: 8px; cursor: pointer; color: #334155; transition: all .15s;
+  }
+  .chip:hover { border-color: var(--blue); color: var(--blue); }
+  .chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .judge-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+  .card { background: var(--panel); border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; }
+  .card h3 { font-size: 12px; margin: 0 0 12px; color: var(--muted); font-weight: 600; letter-spacing: .5px; }
+  .card h3.spaced { margin-top: 22px; }
+  .item {
+    display: flex; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid transparent; transition: background .15s;
+  }
+  .item:hover { background: #f8fafc; }
+  .item input { margin: 2px 0 0; accent-color: var(--blue); flex: 0 0 auto; }
+  .item .txt { font-size: 12.5px; line-height: 1.6; }
+  .item .note { display: block; font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.55; }
+  .item.on { background: #f8fafc; }
+  .item.on .txt { color: var(--ink); font-weight: 500; }
+  .verdict { position: sticky; top: 20px; }
+  .verdict-badge {
+    display: inline-block; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 7px; margin-bottom: 12px;
+  }
+  .v-hold { background: var(--slate-bg); color: #334155; }
+  .v-down { background: var(--amber-bg); color: #78350f; }
+  .v-change { background: var(--red-bg); color: #7f1d1d; }
+  .verdict-title { font-size: 14.5px; font-weight: 600; line-height: 1.5; }
+  .verdict-body { font-size: 12.5px; color: #334155; line-height: 1.75; margin-top: 8px; }
+  .meter { margin-top: 16px; }
+  .meter-row { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+  .bar { height: 6px; background: #eef2f7; border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+  .bar > i { display: block; height: 100%; border-radius: 3px; transition: width .25s; }
+  .bar.d > i { background: var(--red); }
+  .bar.s > i { background: var(--amber); }
+  .reset { margin-top: 6px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-size: 12px; padding: 7px 12px; border-radius: 7px; cursor: pointer; width: 100%; }
+  .reset:hover { color: var(--ink); border-color: var(--faint); }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .legend-item { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; color: #334155; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; flex: 0 0 auto; margin-top: 3px; border: 1px solid rgba(15,23,42,.08); }
+
+  @media (max-width: 900px) {
+    aside { width: 88%; }
+    .judge-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>ZPA 决策流程图</h1>
+    <p>ES 5 分钟 · 市场状态识别与失效判定</p>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="graph">流程总览</button>
+    <button class="tab" data-tab="judge">失效判定</button>
+    <button class="tab" data-tab="legend">图例说明</button>
+  </nav>
+</header>
+
+<div class="workspace">
+  <!-- 流程图 -->
+  <section class="panel active" id="panel-graph">
+    <div class="scroll" id="scroll">
+      <div class="canvas" id="canvas">
+        <svg id="edges"></svg>
+      </div>
+    </div>
+    <aside id="inspector">
+      <button class="close-insp" id="closeInsp" aria-label="关闭">×</button>
+      <div id="inspBody"></div>
+    </aside>
+  </section>
+
+  <!-- 失效判定 -->
+  <section class="panel" id="panel-judge">
+    <div class="judge">
+      <div class="judge-head">
+        <h2>失效判定：哪些证据可以推翻当前判断</h2>
+        <p>先选择你当前对市场的判断，再勾选实际看到的证据。单条辅助证据只降级，两条以上指向同一方向按决定性处理。判定标准对应 ZPA.md 2.5。</p>
+      </div>
+      <div class="state-picker" id="statePicker"></div>
+      <div class="judge-grid">
+        <div class="card" id="evidenceCard"></div>
+        <div class="card verdict" id="verdictCard"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 图例 -->
+  <section class="panel" id="panel-legend">
+    <div class="judge">
+      <div class="judge-head">
+        <h2>图例与使用方式</h2>
+        <p>整张图只回答一个问题：现在是什么状态，以及什么证据能让这个判断作废。</p>
+      </div>
+      <div class="card">
+        <div class="legend-grid">
+          <div class="legend-item"><span class="swatch" style="background:var(--blue-bg);border-color:#93c5fd"></span><span><b>起点 / 决策</b><br>蓝色节点是需要你回答的问题，答案决定往哪走。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:var(--green-bg);border-color:#86efac"></span><span><b>可交易状态</b><br>突破 / 窄通道。唯一可以直接顺势交易的状态。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:var(--amber-bg);border-color:#fcd34d"></span><span><b>过渡状态</b><br>宽通道、震荡区间、趋势减弱。可以交易，但仓位与预期必须下调。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:var(--red-bg);border-color:#fca5a5"></span><span><b>停止交易</b><br>紧密震荡 TTR。减少交易，等待突破。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:#16a34a"></span><span><b>绿色连线</b>：判断为「是」的分支。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:#dc2626"></span><span><b>红色连线</b>：判断为「否」的分支。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:#d97706"></span><span><b>橙色虚线</b>：证据不足时的「不确定」出口，进入观察而不是硬下结论。</span></div>
+          <div class="legend-item"><span class="swatch" style="background:#7c3aed"></span><span><b>紫色虚线</b>：改判回路。走到 ⑤ 之后回到 ② 重新判断，不是直接跳到相反结论。</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>三条前提原则</h3>
+        <div class="detail-body">
+          <ul>
+            <li><b>单条线索只降级，两条以上共振才改判。</b>一根大阴线不构成改判理由，它只让「强趋势」变成「趋势减弱」。</li>
+            <li><b>证据必须可以被否证。</b>说得出「什么情况出现，我就承认这条证据不成立」，才算证据；否则只是情绪。</li>
+            <li><b>改判的动作是回到 ② 重走一遍流程</b>，不是直接跳到对面结论。震荡突破成功之后，仍要通过趋势质量检查，才能认定为趋势。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* =========================================================
+   节点与连线定义
+   ========================================================= */
+const NODES = {
+  A:  { title: '开始：观察当前 ES 5 分钟图表', sub: '从最近一段结构入手', kind: 'start' },
+  B:  { title: '① 看最近一段价格结构', sub: '高低点、波段、K 线重叠', kind: 'action' },
+  C:  { title: '② 是否存在明确的单方向推进？', sub: '看一整段结构，不看单根 K 线', kind: 'decision' },
+  D:  { title: '③ 检查趋势质量', sub: '缺口、跟随、回调、逆势方表现', kind: 'action' },
+  E:  { title: '顺势方是否持续推进？', sub: '逆势方能否获利？', kind: 'decision' },
+  F:  { title: '强趋势候选', sub: '顺势强，逆势方难赚钱', kind: 'state-slate' },
+  G:  { title: '弱趋势候选', sub: '逆势方能赚到钱', kind: 'state-slate' },
+  H:  { title: '缺口是否保持敞开？', sub: '顺势 K 线是否有连续跟随？', kind: 'decision' },
+  J:  { title: '回调是否较深？', sub: '逆势方 Stop 入场能否获利？', kind: 'decision' },
+  I:  { title: '突破 / 窄通道', sub: '强趋势，可顺势持有', kind: 'state-green', tag: '状态' },
+  K:  { title: '宽通道 / 倾斜震荡', sub: '回调更深，双向都能赚钱', kind: 'state-amber', tag: '状态' },
+  L:  { title: '趋势减弱，继续观察', sub: '等待方向，不急于改判', kind: 'state-amber', tag: '等待' },
+  R:  { title: '判断为震荡候选', sub: '重叠较多、双向运动', kind: 'action' },
+  M:  { title: '是否出现明显的双向交易特征？', sub: '上下边界都被反复测试', kind: 'decision' },
+  N:  { title: '震荡区间', sub: '双向交易环境', kind: 'state-amber', tag: '状态' },
+  O:  { title: '是否出现 TTR / 铁丝网？', sub: 'K 线重叠严重、无方向', kind: 'decision' },
+  P:  { title: '紧密震荡区间', sub: '减少交易，等待突破', kind: 'state-red', tag: '停手' },
+  Q:  { title: '普通震荡区间', sub: '观察顶部、底部和突破失败', kind: 'state-amber', tag: '状态' },
+  S:  { title: '④ 持续监控市场变化', sub: '记录证据，不急于改判', kind: 'action' },
+  T:  { title: '⑤ 当前判断属于哪一类？', sub: '分流到对应的失效标准', kind: 'decision' },
+  T1: { title: '强趋势：趋势失效证据？', sub: '决定性 → 回 ②；辅助 → 降为趋势减弱', kind: 'decision' },
+  T2: { title: '宽通道：向震荡或反转？', sub: 'MTR 成立 → 回 ②；双向获利 → 转震荡', kind: 'decision' },
+  T3: { title: 'TTR：突破是否有效？', sub: '有效突破 → 回 ②；假突破 → 仍为 TTR', kind: 'decision' },
+  T4: { title: '普通震荡：是否离开边界？', sub: '离开 → 回 ②；失败返回 → 仍为区间', kind: 'decision' },
+  T5: { title: '趋势减弱：哪方先给方向？', sub: '重回趋势 → 回 ②；双向边界 → 转震荡', kind: 'decision' }
+};
+
+/* 网格坐标：[列, 行]。列距 226，行距 104。 */
+const LAYOUT = {
+  A: [3, 0], B: [3, 1], C: [3, 2],
+  R: [1, 3], D: [3, 3],
+  M: [1, 4], E: [3, 4],
+  N: [0, 5], F: [2, 5], G: [4, 5],
+  O: [0, 6], H: [2, 6], J: [4, 6],
+  P: [0, 7], Q: [1, 7], I: [2, 7], L: [3, 7], K: [4, 7],
+  S: [3, 8], T: [3, 9],
+  T1: [0, 10], T2: [1, 10], T3: [2, 10], T4: [3, 10], T5: [4, 10]
+};
+
+const COL_W = 196, COL_STEP = 226, ROW_STEP = 104, PAD_X = 28, PAD_Y = 22;
+
+/* [from, to, label, type]  type: main | yes | no | doubt | back */
+const EDGES = [
+  ['A', 'B', '', 'main'],
+  ['B', 'C', '', 'main'],
+  ['C', 'D', '是：高低点持续推进', 'yes'],
+  ['C', 'R', '否：重叠较多', 'no'],
+  ['D', 'E', '', 'main'],
+  ['E', 'F', '顺势强，逆势难赚', 'yes'],
+  ['E', 'G', '逆势方能赚钱', 'no'],
+  ['F', 'H', '', 'main'],
+  ['H', 'I', '是', 'yes'],
+  ['H', 'G', '否：出现回补', 'no'],
+  ['G', 'J', '', 'main'],
+  ['J', 'K', '是：回调较深', 'yes'],
+  ['J', 'L', '否', 'no'],
+  ['R', 'M', '', 'main'],
+  ['M', 'N', '是', 'yes'],
+  ['M', 'L', '不确定', 'doubt'],
+  ['N', 'O', '', 'main'],
+  ['O', 'P', '是', 'yes'],
+  ['O', 'Q', '否', 'no'],
+  ['I', 'S', '', 'main'],
+  ['K', 'S', '', 'main'],
+  ['L', 'S', '', 'main'],
+  ['P', 'S', '', 'main'],
+  ['Q', 'S', '', 'main'],
+  ['S', 'T', '', 'main'],
+  ['T', 'T1', '强趋势', 'main'],
+  ['T', 'T2', '宽通道', 'main'],
+  ['T', 'T3', 'TTR', 'main'],
+  ['T', 'T4', '普通震荡', 'main'],
+  ['T', 'T5', '趋势减弱', 'main']
+];
+
+/* =========================================================
+   详情文案
+   ========================================================= */
+const DETAIL = {
+  A: '起点。一切判断都从「最近一段价格结构」开始，而不是从某个形态或某个指标开始。',
+  B: '<ul><li>最近一段的高低点是否在抬高或降低</li><li>波段与波段之间是否重叠</li><li>K 线实体与影线的比例</li></ul>这一步只描述，不下结论。',
+  C: '关键分叉。<b>单方向推进</b>指的是高低点持续推进、价格能突破左侧重要波段点。重叠较多、双向来回走，直接进入震荡支线。<br><br>注意：这几根 K 线的强弱不算数，要看一整段。',
+  D: '趋势质量检查的四件事：<ul><li>缺口是否被制造并保持敞开</li><li>顺势 K 线是否有连续跟随</li><li>回调的深度与时间</li><li>逆势方能否赚到钱，尤其是 Stop 入场</li></ul>',
+  E: '这是整张图最重要的一问。<b>逆势方能不能赚钱</b>，比结构漂不漂亮更能说明问题。限价单在极值赚到钱，说明有人愿意接；Stop 追进去还能赚，说明对手已经不敢防守。',
+  F: '候选状态，尚未确认。还要通过缺口的检验（下一节点）才能定为突破或窄通道。',
+  G: '逆势方开始获利，说明双方优势正在接近。接下来看回调深度决定落在宽通道还是趋势减弱。',
+  H: '缺口是趋势强度的直接证据。保持敞开 + 连续跟随 = 突破；反复回补，说明推动力不足，退回弱趋势分支。',
+  J: '回调超过前一段的 50%，或持续时间很长，且逆势方用 Stop 也能获利，就属于<b>宽通道</b>；回调浅、很快被买回，则只是趋势减弱。',
+  I: '<b>唯一可以顺势满仓持有的状态。</b><br><br>交易策略见 ZPA.md 6.5。失效标准见「失效判定」中的强趋势一项。',
+  K: '通道内仍有方向，但回调更深，逆势方也能获利。可以做，但预期要下调，止损要更宽，避免在通道上沿追多。<br><br>演化方向有两个：反转，或者转成震荡。',
+  L: '这是一个<b>等待状态</b>，没有方向。仓位应减到最小。<br><br>它只有两个出口：顺势方重新给出证据，或者双向边界确立转为震荡。超过 20 根 K 线仍无出口，按震荡处理并空仓。',
+  R: '震荡候选，还需要确认是否构成真正的双向交易环境。',
+  M: '双向特征包括：上下边界各被测试两次以上、两个方向的缺口都被快速回补、价格反复回到波段起点、突破后没有跟随。',
+  N: '正式进入震荡区间。此时不应该再用趋势思维持仓。<br><br>下一步区分紧密震荡与普通震荡，两者的交易方式完全不同。',
+  O: 'TTR（Tight Trading Range）的特征是 K 线严重重叠、几乎每根都被前一根包含、没有连续的方向性推进。',
+  P: '<b>停止交易的状态。</b>紧密震荡中做多做空都容易被扫，正确动作是等待突破，并用突破后的跟随情况判断真假。<br><br>注意 2.3 的第二段陷阱：第二次突破看起来更强，不等于会成功。',
+  Q: '普通震荡区间：在边界附近做反转，不在中间进场。<br><br>观察三件事：顶部、底部，以及突破失败后的回落。',
+  S: '监控阶段不是被动等待，而是<b>主动记录</b>：每 5 根 K 线或每次关键事件记一条证据。改判与不改判都要记。',
+  T: '到达这里说明你已经有一个明确判断。接下来的问题不是「再看一眼」，而是「什么证据能让这个判断作废」。',
+  T1: '强趋势的失效看三件事：逆向缺口是否保持敞开、实体缺口被回补后顺势方能否收复、逆势方 Stop 入场能否持续获利。<br><br>只有回调变深、幅度递减这类辅助证据时，只降级不改判。',
+  T2: '宽通道只有两条演化路径：MTR 成立则走向反转（回 ② 重判）；双向缺口都被快速回补、边界反复测试则转成震荡。',
+  T3: 'TTR 的突破是否有效，看跟随和缺口，不看突破那根 K 线有多长。回踩不重新进入区间内部，才算真突破。',
+  T4: '普通震荡的离开与延续，标准与 TTR 相同：离开边界 + 获得跟随 + 缺口保持敞开。<br><br>如果只是边界被拓宽，仍然是双向环境，只更新坐标，不改变类别。',
+  T5: '观察状态的两个出口：顺势方重新制造并保持缺口（回到趋势），或者双向边界确立（转为震荡）。都没有，就按时限处理。'
+};
+
+/* =========================================================
+   渲染流程图
+   ========================================================= */
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('edges');
+
+const nodesEl = {};
+Object.keys(LAYOUT).forEach(id => {
+  const n = NODES[id];
+  const col = LAYOUT[id][0], row = LAYOUT[id][1];
+  const d = document.createElement('div');
+  d.className = 'node ' + n.kind + (n.tag ? ' tag' : '');
+  d.dataset.id = id;
+  d.style.left = (PAD_X + col * COL_STEP) + 'px';
+  d.style.top = (PAD_Y + row * ROW_STEP) + 'px';
+  if (n.tag) d.dataset.tag = n.tag;
+  d.innerHTML = '<div class="node-title">' + n.title + '</div>' +
+                (n.sub ? '<div class="node-sub">' + n.sub + '</div>' : '');
+  d.addEventListener('click', () => selectNode(id));
+  d.addEventListener('mouseenter', () => hoverNode(id));
+  d.addEventListener('mouseleave', () => hoverNode(null));
+  canvas.appendChild(d);
+  nodesEl[id] = d;
+});
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs) {
+  const e = document.createElementNS(SVG_NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+let edgeEls = [];
+
+function draw() {
+  const box = {};
+  let maxRight = 0, maxBottom = 0;
+  Object.keys(nodesEl).forEach(id => {
+    const e = nodesEl[id];
+    const b = {
+      x: e.offsetLeft, y: e.offsetTop,
+      w: e.offsetWidth, h: e.offsetHeight,
+      row: LAYOUT[id][1]
+    };
+    box[id] = b;
+    maxRight = Math.max(maxRight, b.x + b.w);
+    maxBottom = Math.max(maxBottom, b.y + b.h);
+  });
+
+  const W = maxRight + 134;
+  const H = maxBottom + 106;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.innerHTML = '';
+  edgeEls = [];
+
+  const ALL = EDGES;
+  const inCount = {}, outCount = {};
+  ALL.forEach(([f, t]) => {
+    inCount[t] = (inCount[t] || 0) + 1;
+    outCount[f] = (outCount[f] || 0) + 1;
+  });
+  const seenIn = {}, seenOut = {};
+
+  ALL.forEach(([from, to, label, type]) => {
+    const s = box[from], t = box[to];
+    if (!s || !t) return;
+    const iIn = seenIn[to] || 0; seenIn[to] = iIn + 1;
+    const iOut = seenOut[from] || 0; seenOut[from] = iOut + 1;
+
+    let d = '', lx = 0, ly = 0, anchor = 'middle';
+
+    if (s.row === t.row - 1) {
+      const sxBase = s.x + s.w / 2;
+      const sx = outCount[from] > 1
+        ? sxBase + (iOut - (outCount[from] - 1) / 2) * 30
+        : sxBase;
+      const sy = s.y + s.h;
+      const tx = t.x + t.w / 2;
+
+      if (inCount[to] > 1) {
+        const yRun = sy + 22 + iIn * 7;
+        d = 'M' + sx + ',' + sy + ' V' + yRun + ' H' + tx + ' V' + (t.y - 9);
+        lx = (sx + tx) / 2; ly = yRun - 5;
+      } else if (Math.abs(tx - sx) < 30) {
+        d = 'M' + sx + ',' + sy + ' L' + tx + ',' + (t.y - 9);
+        lx = sx + 9; ly = sy + 22; anchor = 'start';
+      } else {
+        const ty = t.y - 9, gap = ty - sy;
+        d = 'M' + sx + ',' + sy + ' C' + sx + ',' + (sy + gap * .6) + ' ' +
+            tx + ',' + (ty - gap * .6) + ' ' + tx + ',' + ty;
+        lx = (sx + tx) / 2; ly = sy + gap * .45;
+      }
+
+    } else if (t.row > s.row) {
+      const laneX = s.x + s.w + 16;
+      const yMid = t.y - 17;
+      d = 'M' + (s.x + s.w) + ',' + (s.y + s.h / 2) + ' H' + laneX +
+          ' V' + yMid + ' H' + (t.x + t.w / 2) + ' V' + (t.y - 9);
+      lx = laneX + 8; ly = yMid - 7; anchor = 'start';
+
+    } else {
+      const y1 = s.y + s.h / 2, y2 = t.y + t.h / 2;
+      const laneX = t.x - 15;
+      d = 'M' + (s.x + s.w) + ',' + y1 + ' H' + laneX + ' V' + y2 + ' H' + (t.x - 1);
+      lx = s.x + s.w + 8; ly = y1 - 8; anchor = 'start';
+    }
+
+    const path = el('path', { d, class: 'edge ' + type, 'marker-end': 'url(#arw-' + type + ')' });
+    calibre(path, { from, to });
+    svg.appendChild(path);
+    edgeEls.push(path);
+
+    if (label) {
+      const txt = el('text', { x: lx, y: ly, class: 'edge-label', 'text-anchor': anchor });
+      txt.textContent = label;
+      svg.appendChild(txt);
+    }
+  });
+
+  /* 改判回路：从 ⑤ 引出，沿最右侧上行，回到 ② */
+  const busX = W - 84;
+  const tBox = box.T;
+  const bMid = box.B.y + box.B.h / 2;
+  const tMid = tBox.y + tBox.h / 2;
+  const busPath = el('path', {
+    d: 'M' + (tBox.x + tBox.w) + ',' + tMid + ' H' + busX +
+       ' V' + bMid + ' H' + (box.B.x + box.B.w + 3),
+    class: 'edge back', 'marker-end': 'url(#arw-back)'
+  });
+  calibre(busPath, { from: 'T', to: 'B' });
+  svg.appendChild(busPath);
+  edgeEls.push(busPath);
+
+  const bLabel = el('text', {
+    x: tBox.x + tBox.w + 10, y: tMid - 8, class: 'edge-label', 'text-anchor': 'start'
+  });
+  bLabel.textContent = '任一决定性证据 → 回到 ② 重判';
+  svg.appendChild(bLabel);
+
+  // 箭头标记
+  const defs = el('defs', {});
+  ['main', 'yes', 'no', 'doubt', 'back'].forEach(t => {
+    const color = { main: '#94a3b8', yes: '#16a34a', no: '#dc2626', doubt: '#d97706', back: '#7c3aed' }[t];
+    const m = el('marker', {
+      id: 'arw-' + t, viewBox: '0 0 10 10', refX: '8', refY: '5',
+      markerWidth: '6', markerHeight: '6', orient: 'auto-start-reverse'
+    });
+    m.appendChild(el('path', { d: 'M0,0 L10,5 L0,10 z', fill: color }));
+    defs.appendChild(m);
+  });
+  svg.insertBefore(defs, svg.firstChild);
+}
+
+/* 用边索引反查，供高亮使用 */
+function calibre(path, meta) {
+  path.dataset.from = meta.from;
+  path.dataset.to = meta.to;
+}
+
+/* =========================================================
+   选中与高亮
+   ========================================================= */
+const inspector = document.getElementById('inspector');
+const inspBody = document.getElementById('inspBody');
+const START_PANEL = '<span class="tagline">说明</span>' +
+  '<div class="detail-title">点击任意节点查看说明</div>' +
+  '<div class="detail-body">绿色与琥珀色节点是市场状态，点开后可以直接跳到「失效判定」查看它的作废标准。鼠标移到节点上会高亮相关连线。</div>' +
+  '<div class="block"><p class="hint">这张图只回答两件事：<br>1. 现在是什么状态；<br>2. 什么证据能让这个判断作废。</p></div>';
+
+inspBody.innerHTML = START_PANEL;
+
+const STATE_NODES = ['I', 'K', 'L', 'P', 'Q'];
+const STATE_MAP = { I: 'trend', K: 'channel', L: 'weak', P: 'ttr', Q: 'range' };
+
+function hoverNode(id) {
+  const nodes = canvas.querySelectorAll('.node');
+  nodes.forEach(n => n.classList.toggle('dim', id !== null && n.dataset.id !== id));
+  edgeEls.forEach(p => {
+    const on = id !== null && (p.dataset.from === id || p.dataset.to === id);
+    p.classList.toggle('hl', on);
+    p.classList.toggle('dim', id !== null && !on);
+  });
+  canvas.querySelectorAll('.edge-label').forEach(t => { t.style.opacity = id === null ? 1 : .35; });
+}
+
+let current = null;
+function selectNode(id) {
+  current = id;
+  canvas.querySelectorAll('.node').forEach(n => n.classList.toggle('selected', n.dataset.id === id));
+  const n = NODES[id];
+  let html = '<span class="tagline">' + (n.kind.indexOf('state') === 0 ? '市场状态' : '判断节点') + '</span>' +
+             '<div class="detail-title">' + n.title + '</div>';
+  if (n.sub) html += '<div class="detail-body" style="color:#64748b;margin-top:4px">' + n.sub + '</div>';
+  html += '<div class="detail-body">' + (DETAIL[id] || '') + '</div>';
+  if (STATE_NODES.indexOf(id) > -1) {
+    html += '<button class="btn" data-goto="' + STATE_MAP[id] + '">查看该状态的失效标准</button>';
+  }
+  inspBody.innerHTML = html;
+  inspector.classList.add('open');
+}
+
+document.getElementById('closeInsp').addEventListener('click', () => {
+  inspector.classList.remove('open');
+  canvas.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+});
+
+inspector.addEventListener('click', e => {
+  const b = e.target.closest('[data-goto]');
+  if (b) { switchTab('judge'); pickState(b.dataset.goto); inspector.classList.remove('open'); }
+});
+
+/* =========================================================
+   Tab 切换
+   ========================================================= */
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'graph') setTimeout(draw, 30);
+}
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+/* =========================================================
+   失效判定数据
+   ========================================================= */
+const STATES = {
+  trend: {
+    name: '突破 / 窄通道（强趋势）',
+    desc: '当前判断是单方向推进，且推进质量高：缺口保持敞开、K 线有连续跟随、逆势方难以获利。',
+    decisive: [
+      { t: '逆势方制造出缺口，并保持敞开超过 3 根 K 线', n: '不是一根针式的插针，而是实体缺口持续存在。', to: 'B' },
+      { t: '逆势方回补实体缺口后，顺势方连续 3 根以上无法收复该区域', n: '说明该位置已经从支撑变成阻力。', to: 'B' },
+      { t: '逆势方用 Stop 入场也能持续获利', n: '限价单在极值赚到钱只说明有人接；Stop 追进去还能赚，说明顺势方已经不敢防守。这是最强的一条。', to: 'B' }
+    ],
+    support: [
+      { t: '回调超过前一段趋势的 50%，或持续超过 20 根 K 线' },
+      { t: '新高 / 新低的幅度递减（10 点 → 5 点 → 2 点）' },
+      { t: '顺势 K 线跟随变差，重叠 K、内包 K 增多' },
+      { t: '顺势方在重要前高前低提前止盈，未到测量目标就回撤' }
+    ]
+  },
+  channel: {
+    name: '宽通道 / 倾斜震荡',
+    desc: '当前判断是通道内仍有方向，但回调更深，双向都能获利。它只有两条演化路径：反转，或者转成震荡。',
+    decisive: [
+      { t: 'MTR 条件基本齐备：趋势线被突破、EMA20 均线缺口 K、回测原极值失败、双顶或双底', n: '四项同时出现，视为反转开始。', to: 'B' },
+      { t: '结构方向已反向确立：上涨中出现更低高点 + 更低低点，且反攻无力', n: '', to: 'B' },
+      { t: '上下方向的缺口都被快速回补，价格长期滞留在通道中部', n: '通道已经失去方向性，实质是震荡。', to: 'R' },
+      { t: '上下边界各被测试两次以上，每次都出现有效反转', n: '', to: 'R' },
+      { t: '双向用 Stop 入场都能获利，而不只是限价单能赚', n: '这是双向环境的直接证据。', to: 'R' }
+    ],
+    support: [
+      { t: '回调深度持续增加，逐步接近前一段的 100%' },
+      { t: '通道斜率变缓，K 线重叠增多' },
+      { t: '价格突破通道线后迅速回到通道内（假突破增多）' }
+    ]
+  },
+  ttr: {
+    name: '紧密震荡（TTR）',
+    desc: '当前判断是 K 线严重重叠、没有方向性推进。这个状态的默认动作是停止交易，等待突破。',
+    decisive: [
+      { t: '突破后连续 2 到 3 根趋势 K 线，实体饱满，收盘靠近极值', n: '有效突破，回到 ② 重新判断。', to: 'B' },
+      { t: '突破留下的缺口不回补', n: '', to: 'B' },
+      { t: '回踩不重新进入区间内部', n: '', to: 'B' },
+      { t: '突破后 1 到 2 根 K 线内回到区间，且没有跟随', n: '假突破，仍然是 TTR。', to: 'P' }
+    ],
+    support: [
+      { t: '区间边界开始被拓宽，但仍是双向环境' },
+      { t: 'K 线重叠程度下降，出现零星趋势 K' }
+    ]
+  },
+  range: {
+    name: '普通震荡区间',
+    desc: '当前判断是双向交易环境，边界相对清晰，可以在边界附近做反转，不在中间进场。',
+    decisive: [
+      { t: '价格离开边界并获得跟随，缺口保持敞开', n: '成功离开，回到 ② 重判方向。', to: 'B' },
+      { t: '突破失败返回区间，并出现反向结构：双顶、双底、楔形、外包 K', n: '区间延续，仍然有效。', to: 'Q' },
+      { t: '边界被拓宽，但双向特征依然完整', n: '只更新边界坐标，不改变类别。', to: 'Q' }
+    ],
+    support: [
+      { t: '边界测试次数增加，反转力度逐次减弱' },
+      { t: '区间内 K 线实体变小，进入 TTR 特征' }
+    ]
+  },
+  weak: {
+    name: '趋势减弱，观察中',
+    desc: '这是一个等待状态，没有方向。它不该长期停留，只有两个出口。',
+    decisive: [
+      { t: '顺势方重新制造缺口并保持敞开，回调变浅，逆势方再次难以获利', n: '重回趋势，回 ② 确认。', to: 'B' },
+      { t: '双向边界确立：顶底各被测试两次以上', n: '转入震荡。', to: 'R' },
+      { t: '上下两个方向的 Stop 入场都能获利', n: '转入震荡的直接证据。', to: 'R' }
+    ],
+    support: [
+      { t: '推进幅度仍在递减' },
+      { t: '顺势方持续在前高前低提前止盈' },
+      { t: '已持续 20 根 K 线仍无明确出口', n: '超过时限，按震荡或 TTR 处理并空仓。' }
+    ]
+  }
+};
+
+/* =========================================================
+   判定面板
+   ========================================================= */
+const picker = document.getElementById('statePicker');
+const evCard = document.getElementById('evidenceCard');
+const vCard = document.getElementById('verdictCard');
+let stateKey = 'trend';
+
+Object.keys(STATES).forEach(k => {
+  const b = document.createElement('button');
+  b.className = 'chip' + (k === stateKey ? ' active' : '');
+  b.textContent = STATES[k].name;
+  b.dataset.k = k;
+  b.addEventListener('click', () => pickState(k));
+  picker.appendChild(b);
+});
+
+function pickState(k) {
+  stateKey = k;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.k === k));
+  renderEvidence();
+}
+
+function renderEvidence() {
+  const s = STATES[stateKey];
+  let html = '<h3>决定性证据 — 任一条成立即可改判</h3>';
+  s.decisive.forEach((it, i) => {
+    html += '<label class="item" data-type="d" data-i="' + i + '">' +
+      '<input type="checkbox" data-type="d" data-i="' + i + '">' +
+      '<span class="txt">' + it.t + (it.n ? '<span class="note">' + it.n + '</span>' : '') + '</span></label>';
+  });
+  html += '<h3 class="spaced">辅助证据 — 只降级，累计两条以上按决定性处理</h3>';
+  s.support.forEach((it, i) => {
+    html += '<label class="item" data-type="s" data-i="' + i + '">' +
+      '<input type="checkbox" data-type="s" data-i="' + i + '">' +
+      '<span class="txt">' + it.t + (it.n ? '<span class="note">' + it.n + '</span>' : '') + '</span></label>';
+  });
+  evCard.innerHTML = html;
+  evCard.querySelectorAll('input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('.item').classList.toggle('on', cb.checked);
+      renderVerdict();
+    });
+  });
+  renderVerdict();
+}
+
+function renderVerdict() {
+  const s = STATES[stateKey];
+  const dec = [...evCard.querySelectorAll('input[data-type="d"]')].filter(c => c.checked);
+  const sup = [...evCard.querySelectorAll('input[data-type="s"]')].filter(c => c.checked);
+  const dN = dec.length, sN = sup.length;
+
+  let kind, badge, title, body, target = null;
+
+  if (dN > 0) {
+    kind = 'v-change'; badge = '改判';
+    const toR = dec.some(c => s.decisive[+c.dataset.i].to === 'R');
+    target = toR ? 'R' : 'B';
+    title = '原判断已经不成立';
+    body = toR
+      ? '决定性证据成立，且指向震荡方向。建议先按震荡区间处理：缩小仓位、按边界交易，等待新的方向性证据。'
+      : '决定性证据成立。改判的动作是<b>回到 ② 重新走一遍判断流程</b>，不是直接跳到相反结论——强趋势失效后，更常见的下一步是宽通道或震荡区间，而不是立即反转。';
+  } else if (sN >= 2) {
+    kind = 'v-change'; badge = '按决定性处理'; target = 'B';
+    title = '两条以上辅助证据指向同一方向';
+    body = '单条辅助证据只能降级，但多条同时出现说明趋势的延续能力确实在下降。此时按决定性证据处理，回到 ② 重判。';
+  } else if (sN === 1) {
+    kind = 'v-down'; badge = '降级'; target = 'L';
+    title = '只有一条辅助证据，不构成改判';
+    body = '判断降级为「趋势减弱，继续观察」：仓位相应减小，但不反向。继续记录证据，等待第二条共振。';
+  } else {
+    kind = 'v-hold'; badge = '维持';
+    title = '当前判断继续有效';
+    body = '没有任何证据出现。保持原判断，但不要停止记录——<b>没有改判的观察也要写下来</b>，否则复盘时回答不了「我当时为什么没看出来」。';
+  }
+
+  const dRatio = Math.min(100, dN / s.decisive.length * 100);
+  const sRatio = Math.min(100, sN / 2 * 100);
+
+  vCard.innerHTML =
+    '<span class="verdict-badge ' + kind + '">' + badge + '</span>' +
+    '<div class="verdict-title">' + title + '</div>' +
+    '<div class="verdict-body">' + body + '</div>' +
+    '<div class="meter">' +
+      '<div class="meter-row"><span>决定性证据</span><span>' + dN + ' / ' + s.decisive.length + '</span></div>' +
+      '<div class="bar d"><i style="width:' + dRatio + '%"></i></div>' +
+      '<div class="meter-row"><span>辅助证据（2 条起算）</span><span>' + sN + ' / 2</span></div>' +
+      '<div class="bar s"><i style="width:' + sRatio + '%"></i></div>' +
+    '</div>' +
+    '<button class="reset">清空勾选</button>';
+
+  vCard.querySelector('.reset').addEventListener('click', () => {
+    evCard.querySelectorAll('input').forEach(cb => { cb.checked = false; cb.closest('.item').classList.remove('on'); });
+    renderVerdict();
+  });
+}
+
+/* =========================================================
+   初始化
+   ========================================================= */
+renderEvidence();
+window.addEventListener('resize', () => { if (document.getElementById('panel-graph').classList.contains('active')) draw(); });
+window.addEventListener('load', draw);
+setTimeout(draw, 60);
+document.getElementById('scroll').addEventListener('scroll', () => {
+  // SVG 绝对定位在 canvas 内，滚动无需重算
+}, { passive: true });
+</script>
+</body>
+</html>
