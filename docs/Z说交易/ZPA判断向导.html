@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ZPA 判断向导 · ES 5 分钟</title>
+<title>ZPA 读盘向导 · 从缺口开始</title>
 <style>
   :root{
     --bg:#f6f8fb; --panel:#fff; --ink:#0f172a; --muted:#64748b; --faint:#94a3b8;
@@ -13,6 +13,7 @@
     --amber:#b45309; --amber-bg:#fffbeb; --amber-bd:#fcd34d; --amber-ink:#78350f;
     --red:#b91c1c; --red-bg:#fef2f2; --red-bd:#fca5a5; --red-ink:#7f1d1d;
     --slate:#475569; --slate-bg:#f8fafc; --slate-bd:#cbd5e1;
+    --up:#d64545; --dn:#2e9e6b;
     --shadow:0 1px 2px rgba(15,23,42,.04), 0 10px 30px rgba(15,23,42,.07);
   }
   *{ box-sizing:border-box; }
@@ -33,7 +34,7 @@
   .tabs{ display:flex; gap:3px; background:#f1f5f9; padding:3px; border-radius:9px; }
   .tab{
     border:0; background:transparent; font:inherit; font-size:12.5px; color:var(--muted);
-    padding:6px 14px; border-radius:7px; cursor:pointer; transition:all .15s;
+    padding:6px 13px; border-radius:7px; cursor:pointer; transition:all .15s; white-space:nowrap;
   }
   .tab:hover{ color:var(--ink); }
   .tab.active{ background:#fff; color:var(--ink); font-weight:500; box-shadow:0 1px 2px rgba(15,23,42,.10); }
@@ -44,17 +45,17 @@
 
   /* ---------- 主舞台 ---------- */
   .stage{
-    flex:1 1 auto; min-width:0; overflow-y:auto; padding:26px 24px 90px;
+    flex:1 1 auto; min-width:0; overflow-y:auto; padding:24px 24px 90px;
     display:flex; flex-direction:column; align-items:center; justify-content:safe center;
     overflow-x:hidden;
   }
   .crumb{
-    width:100%; max-width:660px; font-size:11.5px; color:var(--faint);
+    width:100%; max-width:680px; font-size:11.5px; color:var(--faint);
     margin-bottom:12px; line-height:1.6; letter-spacing:.2px;
   }
   .crumb i{ font-style:normal; margin:0 5px; color:#cbd5e1; }
 
-  .cardwrap{ width:100%; max-width:660px; }
+  .cardwrap{ width:100%; max-width:680px; }
   .cardwrap.fwd{ animation:inFwd .26s cubic-bezier(.22,.9,.32,1) both; }
   .cardwrap.back{ animation:inBack .26s cubic-bezier(.22,.9,.32,1) both; }
   @keyframes inFwd{ from{ opacity:0; transform:translateX(20px) } to{ opacity:1; transform:none } }
@@ -88,13 +89,25 @@
   .stance{
     display:flex; gap:9px; align-items:flex-start; margin:16px 0 4px; padding:11px 13px;
     border-radius:9px; font-size:12.5px; line-height:1.65;
-    background:var(--tone-bg,#f8fafc); color:#334155; border:1px solid var(--tone-bd,var(--line));
+    background:#f8fafc; color:#334155; border:1px solid var(--line);
   }
   .card.t-green .stance{ background:var(--green-bg); border-color:var(--green-bd); }
   .card.t-amber .stance{ background:var(--amber-bg); border-color:var(--amber-bd); }
   .card.t-red .stance{ background:var(--red-bg); border-color:var(--red-bd); }
+  .card.t-slate .stance{ background:#f8fafc; border-color:var(--slate-bd); }
   .stance b{ font-weight:600; color:var(--ink); }
   .stance .ic{ font-size:13px; line-height:1.5; }
+
+  /* 「在图上指出来」 */
+  .observe{
+    display:flex; gap:9px; margin:14px 0 0; padding:10px 12px;
+    border:1px dashed #d9e2ef; background:#fbfcfe; border-radius:9px;
+    font-size:12.5px; line-height:1.72; color:#475569;
+  }
+  .observe .lb{
+    flex:0 0 auto; font-size:10px; letter-spacing:.5px; color:#64748b; background:#eef2f7;
+    border-radius:4px; padding:1px 5px; height:fit-content; margin-top:1px; white-space:nowrap;
+  }
 
   .sect{
     font-size:11px; letter-spacing:.7px; color:var(--faint); font-weight:600;
@@ -153,15 +166,25 @@
   .exit:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
   .exit.dec{ border-left-color:#dc2626; }
   .exit.sup{ border-left-color:#d97706; }
+  .exit.act{ border-left-color:#2563eb; }
+  .exit.chk{ border-left-color:#64748b; }
   .exit.none{ border-left-color:#cbd5e1; }
   .exit.dec:hover{ border-color:#f3a3a3; border-left-color:#dc2626; }
   .exit.sup:hover{ border-color:#f0c46a; border-left-color:#d97706; }
+  .exit.act:hover{ border-color:#bfdbfe; border-left-color:#2563eb; }
+  .exit.chk:hover{ border-color:#cbd5e1; border-left-color:#64748b; }
   .ex-top{ display:flex; align-items:center; gap:8px; }
   .ex-name{ font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.5; }
   .ex-n{ margin-left:auto; font-size:11px; color:var(--faint); white-space:nowrap; }
   .ex-desc{ display:block; font-size:12px; color:var(--muted); line-height:1.65; margin-top:5px; }
   .ex-go{ display:inline-block; font-size:11.5px; color:var(--blue); margin-top:8px; }
   .ex-go i{ font-style:normal; margin-left:3px; }
+
+  /* ---------- 打法三栏 ---------- */
+  .play{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:10px; }
+  .play .pc{ border:1px solid var(--line); border-radius:9px; padding:9px 10px; background:#fff; }
+  .play .pc h5{ margin:0 0 5px; font-size:10px; letter-spacing:.6px; color:var(--faint); font-weight:600; }
+  .play .pc p{ margin:0; font-size:12px; line-height:1.62; color:#334155; }
 
   /* ---------- 说明折叠 ---------- */
   .why{ margin-top:14px; border-top:1px solid var(--line2); padding-top:10px; }
@@ -183,7 +206,7 @@
   /* ---------- 卡片底栏 ---------- */
   .card-bar{
     display:flex; align-items:center; gap:8px; margin-top:14px;
-    width:100%; max-width:660px; font-size:12px;
+    width:100%; max-width:680px; font-size:12px;
   }
   .mini{
     border:1px solid var(--line); background:#fff; color:var(--muted); font:inherit; font-size:12px;
@@ -200,14 +223,14 @@
 
   /* ---------- 右侧栏 ---------- */
   .rail{
-    flex:0 0 252px; border-left:1px solid var(--line); background:var(--panel);
+    flex:0 0 264px; border-left:1px solid var(--line); background:var(--panel);
     padding:20px 18px; overflow-y:auto;
   }
   .rail h3{
     font-size:10.5px; letter-spacing:.9px; color:var(--faint); font-weight:600;
     margin:0 0 10px; text-transform:uppercase;
   }
-  .rail .block + .block{ margin-top:26px; padding-top:20px; border-top:1px solid var(--line2); }
+  .rail .block + .block{ margin-top:24px; padding-top:18px; border-top:1px solid var(--line2); }
   .map-item{
     display:flex; align-items:center; gap:8px; width:100%; text-align:left;
     font:inherit; font-size:12px; color:#334155; background:transparent; border:1px solid transparent;
@@ -218,6 +241,12 @@
   .map-item.g .dot{ background:#16a34a; } .map-item.a .dot{ background:#d97706; }
   .map-item.r .dot{ background:#dc2626; } .map-item.s .dot{ background:#94a3b8; }
   .map-item.on{ background:#f1f5f9; border-color:var(--line); font-weight:600; color:var(--ink); }
+
+  .evlist{ list-style:none; margin:0; padding:0; }
+  .evrow{ display:flex; gap:8px; font-size:11.5px; line-height:1.6; padding:6px 0; border-bottom:1px dashed var(--line2); }
+  .evrow .k{ flex:0 0 40px; color:var(--faint); }
+  .evrow .v{ flex:1 1 auto; color:#334155; }
+  .evempty{ font-size:11.5px; line-height:1.7; color:var(--faint); }
 
   .trail{ list-style:none; margin:0; padding:0; }
   .trail li{ position:relative; padding-left:16px; }
@@ -249,12 +278,31 @@
   }
 
   /* ---------- 文档类页面 ---------- */
-  .doc{ max-width:960px; margin:0 auto; padding:28px 24px 80px; width:100%; overflow-y:auto; }
+  .doc{ max-width:980px; margin:0 auto; padding:26px 24px 80px; width:100%; overflow-y:auto; }
   .doc-head h2{ font-size:17px; margin:0 0 6px; }
-  .doc-head p{ font-size:12.5px; color:var(--muted); margin:0 0 22px; line-height:1.75; }
+  .doc-head p{ font-size:12.5px; color:var(--muted); margin:0 0 22px; line-height:1.8; }
   .card-static{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
   .card-static + .card-static{ margin-top:14px; }
   .card-static h3{ font-size:12px; margin:0 0 12px; color:var(--muted); font-weight:600; letter-spacing:.5px; }
+  .card-static p{ font-size:12.5px; line-height:1.8; color:#475569; margin:0 0 10px; }
+  .card-static p:last-child{ margin-bottom:0; }
+  .hl{ background:#fff7e6; border-bottom:1px solid #fcd34d; padding:0 2px; }
+
+  .svgwrap{ margin:12px 0 4px; background:#fcfdff; border:1px solid var(--line2); border-radius:10px; padding:8px 6px 2px; overflow-x:auto; }
+  .svgwrap svg{ display:block; max-width:100%; height:auto; }
+  .svgnote{ font-size:11.5px; line-height:1.7; color:var(--faint); text-align:center; padding:2px 8px 8px; }
+
+  .principles{ display:grid; gap:12px; }
+  .pr{ display:flex; gap:11px; font-size:13px; line-height:1.75; color:#334155; }
+  .pr .n{
+    flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--blue-bg); color:var(--blue);
+    font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; margin-top:2px;
+  }
+  table.rec{ width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
+  table.rec th, table.rec td{ border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; line-height:1.65; }
+  table.rec th{ background:#f8fafc; color:var(--muted); font-weight:600; font-size:11px; }
+  table.rec td b{ font-weight:600; }
+  .ok{ color:var(--green-ink); } .no{ color:var(--red-ink); } .mid{ color:var(--amber-ink); }
 
   /* 迁移表 */
   .mrow{ display:grid; grid-template-columns:190px 1fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line2); }
@@ -278,27 +326,19 @@
   .mline.w-dec .ev::before{ content:"决定性 · "; font-size:10.5px; color:var(--red); }
   .mline.w-sup .ev::before{ content:"辅助 · "; font-size:10.5px; color:var(--amber); }
   .mline.w-none .ev::before{ content:"无变化 · "; font-size:10.5px; color:var(--faint); }
+  .mline.w-act .ev::before{ content:"动作 · "; font-size:10.5px; color:var(--blue); }
+  .mline.w-chk .ev::before{ content:"验证 · "; font-size:10.5px; color:#64748b; }
 
-  .principles{ display:grid; gap:12px; }
-  .pr{ display:flex; gap:11px; font-size:13px; line-height:1.75; color:#334155; }
-  .pr .n{
-    flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:var(--blue-bg); color:var(--blue);
-    font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; margin-top:2px;
-  }
-  table.rec{ width:100%; border-collapse:collapse; font-size:12px; margin-top:4px; }
-  table.rec th, table.rec td{ border:1px solid var(--line); padding:7px 9px; text-align:left; }
-  table.rec th{ background:#f8fafc; color:var(--muted); font-weight:600; font-size:11px; }
-
-  @media (max-width: 620px){
+  @media (max-width: 720px){
     .opt{ flex-wrap:wrap; }
     .opt .go{ width:100%; margin-top:6px; padding-left:30px; }
     .ex-n{ display:none; }
     .crumb{ display:none; }
+    .play{ grid-template-columns:1fr; }
   }
-
-  @media (max-width: 940px){
+  @media (max-width: 980px){
     header{ flex-wrap:wrap; padding:10px 14px; gap:10px; }
-    .tabs{ width:100%; }
+    .tabs{ width:100%; overflow-x:auto; }
     .tab{ flex:1 1 auto; text-align:center; padding:6px 8px; }
     .rail{ display:none; }
     .stage{ padding:18px 14px 80px; }
@@ -312,19 +352,21 @@
 
 <header>
   <div class="brand">
-    <h1>ZPA 判断向导</h1>
-    <p>ES 5 分钟 · 每一步只看一个问题</p>
+    <h1>ZPA 读盘向导</h1>
+    <p>ES 5 分钟 · 先找缺口，再看缺口行为</p>
   </div>
   <nav class="tabs">
-    <button class="tab active" data-tab="guide">判断</button>
+    <button class="tab active" data-tab="guide">读盘</button>
+    <button class="tab" data-tab="gap">缺口</button>
+    <button class="tab" data-tab="sr">位置·目标</button>
+    <button class="tab" data-tab="exec">打法·空仓</button>
     <button class="tab" data-tab="map">状态地图</button>
-    <button class="tab" data-tab="rule">判断原则</button>
   </nav>
 </header>
 
 <div class="workspace">
 
-  <!-- 引导 -->
+  <!-- ================= 读盘 ================= -->
   <section class="panel active" id="panel-guide">
     <div class="stage">
       <div class="crumb" id="crumb"></div>
@@ -334,12 +376,16 @@
         <button class="mini" id="btnRestart">重新开始</button>
         <span class="spacer"></span>
         <span class="toast" id="toast">已复制</span>
-        <button class="mini" id="btnCopy">复制本次结论</button>
+        <button class="mini" id="btnCopy">复制读盘记录</button>
       </div>
     </div>
     <aside class="rail">
       <div class="block">
-        <h3>状态地图</h3>
+        <h3>读盘记录</h3>
+        <ul class="evlist" id="railEv"></ul>
+      </div>
+      <div class="block">
+        <h3>结论</h3>
         <div id="railMap"></div>
       </div>
       <div class="block">
@@ -353,52 +399,316 @@
     </aside>
   </section>
 
-  <!-- 状态地图 -->
-  <section class="panel" id="panel-map">
+  <!-- ================= 缺口 ================= -->
+  <section class="panel" id="panel-gap">
     <div class="doc">
       <div class="doc-head">
-        <h2>五个状态，和它们之间唯一的通道</h2>
-        <p>这里不画完整流程图，只列状态机：每个状态现在是什么、什么条件下切换到哪。点右侧任一「去哪」可以直接跳到那一步。</p>
+        <h2>ZPA 的缺口，不是隔夜跳空</h2>
+        <p>它的定义只有一句：<b>相邻两根 K 线的实体之间，没有重叠的价格区间。</b>中间空出来的那一段，就是缺口。缺口之所以有效，不是因为"形态好看"，而是因为那段区间里有人被套住了，而人是要解套的。</p>
       </div>
-      <div class="card-static" id="mapTable"></div>
+
       <div class="card-static">
-        <h3>两个隐藏动作</h3>
+        <h3>一 · 两种缺口，两个完全不同的意思</h3>
+        <table class="rec">
+          <thead><tr><th style="width:130px">类型</th><th>怎么形成</th><th style="width:190px">它意味着</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>突破型缺口</b><br><span style="color:#94a3b8;font-size:11px">用得最多</span></td>
+              <td>一方<b>押注突破失败</b>，结果对方突破成功，并且有跟随。押错的一方被套，有强烈的<b>打平需求</b>。</td>
+              <td>价格回到缺口 = 被套方解套 = 反向的订单流 = 支撑/阻力</td>
+            </tr>
+            <tr>
+              <td><b>信号 K 缺口</b></td>
+              <td>一根好的信号 K 被跟随，后来价格回到这根信号 K 的 stop 位置，当时入场的人<b>再次进场</b>（或被打保本损）。</td>
+              <td>入场方的再次入场 / 保本损位置。用得少，但在趋势顶底非常准</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top:12px">找突破型缺口，锚点只看四种 K 线——因为只有它们的<b>成交集中在一个点上</b>：</p>
+        <ul class="tips">
+          <li><b>光头阴线</b>（几乎没有上影）：开盘即抛，空头全被套在<b>最高点/开盘价</b>。</li>
+          <li><b>光脚阳线</b>（几乎没有下影）：开盘即买，多头全被套在<b>最低点/收盘价</b>。</li>
+          <li><b>长下影阳线、长上影阴线</b>（pin bar）：影线那一端是集中成交的位置。</li>
+        </ul>
+        <p style="margin-top:10px">关键补充：<b>实体收过去的那一刻就已经有缺口了</b>，但必须<b>有跟随</b>才算数。没有跟随的突破，对方还有解套机会，不会形成真正的套牢盘——这就是"为什么要看跟随"的全部理由。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>二 · 缺口套住的是谁（示意图）</h3>
+        <div class="svgwrap">
+          <svg viewBox="0 0 560 190" role="img" aria-label="突破型缺口示意图">
+            <line x1="40" y1="30" x2="520" y2="30" stroke="#eef2f7" stroke-width="1"/>
+            <line x1="40" y1="70" x2="520" y2="70" stroke="#eef2f7" stroke-width="1"/>
+            <line x1="40" y1="110" x2="520" y2="110" stroke="#eef2f7" stroke-width="1"/>
+            <line x1="40" y1="150" x2="520" y2="150" stroke="#eef2f7" stroke-width="1"/>
+            <!-- 缺口带 -->
+            <rect x="96" y="70" width="300" height="14" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3" stroke-width="1"/>
+            <text x="398" y="80" font-size="10.5" fill="#b45309">缺口 = 两根实体之间没重叠的一段</text>
+            <!-- 1 光脚阳线 -->
+            <line x1="82" y1="34" x2="82" y2="40" stroke="#d64545" stroke-width="1.5"/>
+            <rect x="76" y="40" width="13" height="30" fill="#d64545"/>
+            <!-- 2 大阴线 实体下破 -->
+            <line x1="112" y1="78" x2="112" y2="84" stroke="#2e9e6b" stroke-width="1.5"/>
+            <rect x="106" y="84" width="13" height="28" fill="#2e9e6b"/>
+            <line x1="112" y1="112" x2="112" y2="120" stroke="#2e9e6b" stroke-width="1.5"/>
+            <!-- 3 跟随阴线 -->
+            <line x1="142" y1="104" x2="142" y2="110" stroke="#2e9e6b" stroke-width="1.5"/>
+            <rect x="136" y="110" width="13" height="24" fill="#2e9e6b"/>
+            <line x1="142" y1="134" x2="142" y2="142" stroke="#2e9e6b" stroke-width="1.5"/>
+            <!-- 4 小反弹 -->
+            <rect x="166" y="92" width="13" height="20" fill="#d64545"/>
+            <line x1="172" y1="86" x2="172" y2="92" stroke="#d64545" stroke-width="1.5"/>
+            <line x1="172" y1="112" x2="172" y2="118" stroke="#d64545" stroke-width="1.5"/>
+            <!-- 5 阴 -->
+            <rect x="196" y="96" width="13" height="24" fill="#2e9e6b"/>
+            <line x1="202" y1="90" x2="202" y2="96" stroke="#2e9e6b" stroke-width="1.5"/>
+            <!-- 6 回抽到被套价 -->
+            <line x1="232" y1="70" x2="232" y2="76" stroke="#d64545" stroke-width="1.5"/>
+            <rect x="226" y="76" width="13" height="20" fill="#d64545"/>
+            <line x1="232" y1="96" x2="232" y2="100" stroke="#d64545" stroke-width="1.5"/>
+            <!-- 7 大阴下跌 -->
+            <rect x="256" y="82" width="13" height="46" fill="#2e9e6b"/>
+            <line x1="262" y1="78" x2="262" y2="82" stroke="#2e9e6b" stroke-width="1.5"/>
+            <line x1="262" y1="128" x2="262" y2="136" stroke="#2e9e6b" stroke-width="1.5"/>
+            <!-- 标注 -->
+            <line x1="232" y1="70" x2="212" y2="52" stroke="#94a3b8" stroke-width="1"/>
+            <text x="150" y="49" font-size="10.5" fill="#475569">回到这里 → 被套多头打平（卖出）</text>
+            <line x1="112" y1="98" x2="92" y2="160" stroke="#94a3b8" stroke-width="1"/>
+            <text x="52" y="174" font-size="10.5" fill="#475569">阳线实体被阴线实体整体穿过去 → 多头被套在其收盘价</text>
+            <text x="470" y="168" font-size="10" fill="#94a3b8">红=阳 绿=阴</text>
+          </svg>
+        </div>
+        <div class="svgnote">光脚阳线的低点（=多头入场价）与阴线实体之间的那段空隙，就是多头必须回来打平的位置。</div>
+      </div>
+
+      <div class="card-static">
+        <h3>三 · 回补有四档，弱到什么程度是量的</h3>
+        <div class="svgwrap">
+          <svg viewBox="0 0 560 150" role="img" aria-label="四档回补等级示意图">
+            <!-- 面板 1 -->
+            <rect x="20" y="44" width="100" height="14" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3"/>
+            <rect x="62" y="12" width="14" height="26" fill="#2e9e6b"/>
+            <line x1="69" y1="38" x2="69" y2="52" stroke="#2e9e6b" stroke-width="1.5"/>
+            <text x="70" y="95" font-size="11" fill="#0f172a" text-anchor="middle">引线补引线</text>
+            <text x="70" y="112" font-size="10" fill="#94a3b8" text-anchor="middle">只是探一下</text>
+            <!-- 面板 2 -->
+            <rect x="158" y="44" width="100" height="14" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3"/>
+            <rect x="200" y="12" width="14" height="38" fill="#2e9e6b"/>
+            <line x1="207" y1="50" x2="207" y2="58" stroke="#2e9e6b" stroke-width="1.5"/>
+            <text x="208" y="95" font-size="11" fill="#0f172a" text-anchor="middle">实体补引线</text>
+            <text x="208" y="112" font-size="10" fill="#94a3b8" text-anchor="middle">开始变弱</text>
+            <!-- 面板 3 -->
+            <rect x="296" y="44" width="100" height="14" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3"/>
+            <rect x="338" y="10" width="14" height="60" fill="#2e9e6b"/>
+            <line x1="345" y1="70" x2="345" y2="78" stroke="#2e9e6b" stroke-width="1.5"/>
+            <text x="346" y="95" font-size="11" fill="#0f172a" text-anchor="middle">实体补实体</text>
+            <text x="346" y="112" font-size="10" fill="#94a3b8" text-anchor="middle">逆势方能拿到的极限</text>
+            <!-- 面板 4 -->
+            <rect x="434" y="44" width="100" height="14" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3"/>
+            <rect x="476" y="12" width="14" height="24" fill="#2e9e6b"/>
+            <line x1="483" y1="36" x2="483" y2="42" stroke="#2e9e6b" stroke-width="1.5"/>
+            <text x="484" y="95" font-size="11" fill="#0f172a" text-anchor="middle">差一点没补</text>
+            <text x="484" y="112" font-size="10" fill="#b45309" text-anchor="middle">有一方已经抢跑</text>
+            <text x="280" y="136" font-size="10" fill="#94a3b8" text-anchor="middle">← 越往右，缺口被消耗得越彻底，制造缺口那一方越弱；第四种反而说明对方没力气了 →</text>
+          </svg>
+        </div>
+        <div class="svgnote">"差一点没补完"不是缺口的失败，是反方向的强证据：连最后一个 tick 都推不进去，说明那一方已经不想再推了。</div>
+      </div>
+
+      <div class="card-static">
+        <h3>四 · 缺口行为三问——整个背景判断就靠这三条</h3>
+        <table class="rec">
+          <thead><tr><th style="width:200px">问</th><th>是</th><th>否</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>① 制造 / 无法制造</b><br><span style="font-size:11px;color:#94a3b8">（看顺势方）</span></td>
+              <td class="ok">能造出缺口并保持敞开 → 突破阶段，强趋势，有资格谈测量目标</td>
+              <td class="no">造了就补、补了又造 → 假突破 / 弱趋势，先按震荡准备</td>
+            </tr>
+            <tr>
+              <td><b>② 回补 / 无法回补</b><br><span style="font-size:11px;color:#94a3b8">（看逆势方）</span></td>
+              <td class="mid">逆势方能回补、能赚钱 → 阶梯模式，这是宽通道，双向的</td>
+              <td class="ok">怎么都补不掉 → 顺势方真的强，别逆</td>
+            </tr>
+            <tr>
+              <td><b>③ 回补实体 / 无法回补实体</b><br><span style="font-size:11px;color:#94a3b8">（看极限）</span></td>
+              <td class="no">实体缺口补完还不恢复 → 大概率已经震荡 / 正在反转</td>
+              <td class="ok">实体缺口都补不掉 → 逆势方到极限了，趋势会继续</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top:12px"><b>为什么这三条能替代"看起来像趋势还是像震荡"？</b>因为它们是<b>可以指出来、可以被否证的</b>：哪根 K 线造的缺口、第几根被补、补到实体还是只到引线。你不需要判断"这里是不是顶"，只需要回答"这个缺口被补了没有"。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>五 · 最有效的两个缺口</h3>
         <div class="principles">
-          <div class="pr"><span class="n">↺</span><span><b>改判不是跳到对面，而是回到结构扫描。</b>强趋势失效后更常见的下一步是宽通道或震荡，不是立刻反转。所有指向「回 ②」的箭头都是这个意思。</span></div>
-          <div class="pr"><span class="n">↓</span><span><b>单条只降级，两条才改判。</b>辅助证据一条只让「突破 / 窄通道」变成「趋势减弱」，第二条出现才按决定性处理。</span></div>
+          <div class="pr"><span class="n">1</span><span><b>精准测量型缺口。</b>一段趋势里会造出很多缺口，每个都有自己的测量目标。但只有某一个缺口对应的目标位，到达时反应<b>极其剧烈</b>（连实体都收不过去，全是引线）。那个缺口就是这段趋势里最强的一批机构的建仓位置——他们止盈了，接下来要回补也最可能回到那里。这就是最好的回调目标位。</span></div>
+          <div class="pr"><span class="n">2</span><span><b>最后一个缺口。</b>整段趋势里最后留下的、直到现在还没被回补的那个缺口。它代表引导这段趋势的那批人，强度仅次于精准测量型。反转要成立，通常得先把它补掉。</span></div>
+        </div>
+        <p style="margin-top:12px">实战含义：<b>做回调的时候，先补最近的那个缺口，别一上来就幻想回到趋势起点。</b></p>
+      </div>
+
+      <div class="card-static">
+        <h3>六 · 陷阱：区间顶底造的缺口，大概率是给你追的</h3>
+        <div class="svgwrap">
+          <svg viewBox="0 0 560 175" role="img" aria-label="第二段陷阱示意图">
+            <line x1="40" y1="50" x2="520" y2="50" stroke="#cbd5e1" stroke-dasharray="5 4" stroke-width="1"/>
+            <line x1="40" y1="125" x2="520" y2="125" stroke="#cbd5e1" stroke-dasharray="5 4" stroke-width="1"/>
+            <text x="46" y="45" font-size="10" fill="#94a3b8">区间上沿</text>
+            <text x="46" y="140" font-size="10" fill="#94a3b8">区间下沿</text>
+            <rect x="285" y="126" width="70" height="10" fill="#fdf0d5" stroke="#f0c46a" stroke-dasharray="4 3"/>
+            <polyline points="70,62 150,120 212,74 286,132 350,86 420,60 488,58"
+              fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="150" cy="120" r="3" fill="#475569"/>
+            <circle cx="286" cy="132" r="3" fill="#475569"/>
+            <circle cx="488" cy="58" r="3" fill="#475569"/>
+            <text x="150" y="160" font-size="10.5" fill="#475569" text-anchor="middle">第一腿：到边界就止</text>
+            <text x="320" y="152" font-size="10.5" fill="#b45309" text-anchor="middle">第二腿：破边 + 造缺口（看着最强）</text>
+            <text x="470" y="60" font-size="10.5" fill="#475569" text-anchor="middle">失败 → 反向</text>
+          </svg>
+        </div>
+        <div class="svgnote">区间底部向下造缺口 ≈ 诱空；区间顶部向上造缺口 ≈ 诱多。位置越靠近边界、这一段跑得越久，越可能是陷阱。</div>
+        <p style="margin-top:12px">判别的硬标准：<b>这个缺口出现在区间的哪个位置？</b>同样的动作，在趋势中段是突破，在区间顶底就是收割。所以缺口的意义永远由背景决定，不能单独看。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 位置·目标 ================= -->
+  <section class="panel" id="panel-sr">
+    <div class="doc">
+      <div class="doc-head">
+        <h2>位置只从已经成交的地方取</h2>
+        <p>静态的先画好，动态的跟着价格算。单一位置不生效，叠加才生效——至少两个理由，才叫 setup。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>一 · 静态（盘前就该画完，不许盘中改）</h3>
+        <table class="rec">
+          <thead><tr><th style="width:180px">来源</th><th>怎么取</th><th style="width:230px">为什么有效</th></tr></thead>
+          <tbody>
+            <tr><td>前波段高 / 低</td><td>上一个同向推进段的极值，要求那里有反向跟随（不是孤零零一根针）</td><td>突破成功 → 押错的一方被套；突破失败 → 这里就是押注者的防守位</td></tr>
+            <tr><td><b>好趋势 K 的收盘价</b></td><td>光头光脚、实体饱满、收在极值的那根 K 线的收盘价</td><td>机构会买/卖收盘；跟随一差，他们就在这个价打平离场 → 最硬的支撑阻力</td></tr>
+            <tr><td>昨日高 / 低 / 收盘</td><td>固定坐标，开盘前画好</td><td>隔夜留下的套牢与止损都挂在这些位置</td></tr>
+            <tr><td>未回补缺口的上下沿</td><td>直接把缺口边缘当线用</td><td>被套方的打平价</td></tr>
+            <tr><td>50% 回调</td><td>起涨点 → 最高点的一半</td><td>多空盈亏比在这里都是 1:1，顺势方胜率约 60%，数学上就是正期望</td></tr>
+            <tr><td>通道线 / 趋势线</td><td>三点触及才画；失效就删</td><td>不为证明自己而留线</td></tr>
+            <tr><td>当日开盘、通道起点</td><td>开盘价、这段推进的起涨/起跌点</td><td>趋势前提的位置：破了，这段趋势的理由就没了</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-static">
+        <h3>二 · 动态（跟着价格算出来）</h3>
+        <table class="rec">
+          <thead><tr><th style="width:210px">方法</th><th>怎么量</th></tr></thead>
+          <tbody>
+            <tr><td>AB = CD（实体 / 影线）</td><td>两腿结构里，第一腿的收盘到收盘（或高点到高点），在第二腿起点等距投出去</td></tr>
+            <tr><td>MM：被突破前的波段高低点</td><td>突破前那个波段低点 → 突破后的高点，翻一倍</td></tr>
+            <tr><td>MM：单腿回调制造的波段</td><td>用回调腿的高点/低点去量，本质同上，换了个起点</td></tr>
+            <tr><td>急速腿 / 微通道的 MM</td><td>连续同色 K 线（微通道）的缺口处起量，单腿翻一倍——很准，别忽略</td></tr>
+            <tr><td>EMA20</td><td>只当叠加用，单独不构成理由</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:12px"><b>测量的纪律：</b>能画的全都画，画错不要紧。多个目标位时，<b>先取最近的那个</b>，别一上来就期待最远的目标。价格到了一个目标位，看它的反应——反应剧烈就是这一段的主导机构在止盈，那就是你该关注的位置。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>三 · 什么叫"叠加够了"</h3>
+        <div class="principles">
+          <div class="pr"><span class="n">1</span><span><b>一个理由不做。</b>单一支撑阻力生效的概率很低。你至少需要两个能说出口的理由——而且最好一个是背景，一个是位置。</span></div>
+          <div class="pr"><span class="n">2</span><span><b>最好的组合：背景 + 支撑阻力 + 形态。</b>形态不只是三角形楔形：内包 K、ii、ioi、二次入场、二次回补缺口失败、双顶双底、三推楔形、通道线 overshoot，都算。</span></div>
+          <div class="pr"><span class="n">3</span><span><b>位置必须被"测试过"才算数。</b>价格进入该区域，并且出现有效反转 K（收盘脱离该区域、下一根没有立刻吃掉它）。只是扫一下就走的，不计次数。</span></div>
+          <div class="pr"><span class="n">4</span><span><b>用过的位置就删掉。</b>缺口补完了、边界被有效突破了，那条线留着只会骗自己。</span></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 判断原则 -->
-  <section class="panel" id="panel-rule">
+  <!-- ================= 打法·空仓 ================= -->
+  <section class="panel" id="panel-exec">
     <div class="doc">
       <div class="doc-head">
-        <h2>判定时要知道的三条</h2>
-        <p>对应 ZPA.md 2.5「市场状态的切换与失效判定」。向导里的每个选项都是从这里拆出来的。</p>
+        <h2>先定方向，再找位置，最后才是扣扳机</h2>
+        <p>顺序不能反。背景决定做哪一边，位置决定在哪进，形态决定什么时候进。理由不够就空仓——空仓比乱打值钱。</p>
       </div>
+
       <div class="card-static">
-        <div class="principles">
-          <div class="pr"><span class="n">1</span><span><b>单条线索只能降级，两条以上共振才能改判。</b>一根大阴线不构成改判理由，它只让「强趋势」变成「趋势减弱，继续观察」。</span></div>
-          <div class="pr"><span class="n">2</span><span><b>证据必须可以被否证。</b>说得出「什么情况出现，我就承认这条证据不成立」，才算证据；否则只是情绪。</span></div>
-          <div class="pr"><span class="n">3</span><span><b>改判的动作是回到 ② 重走一遍。</b>不是直接跳到对面的结论——震荡突破成功之后，仍要通过趋势质量检查，才能认定为趋势。</span></div>
-        </div>
-      </div>
-      <div class="card-static">
-        <h3>证据记录格式 · 每 5 根 K 线或每次关键事件记一行</h3>
+        <h3>一 · 入场方式：stop 单还是限价单，取决于你在做哪一边</h3>
         <table class="rec">
-          <thead><tr><th>时间</th><th>观察到的证据</th><th>类别</th><th>原判断</th><th>新判断</th></tr></thead>
+          <thead><tr><th style="width:120px">方式</th><th>你进场那一刻的身份</th><th>什么时候用</th></tr></thead>
           <tbody>
-            <tr><td>10:35</td><td>空头回补实体缺口后，3 根阳线未收复</td><td>A1</td><td>窄通道↑</td><td>回 ② 重判</td></tr>
+            <tr><td><b>Stop 单</b></td><td>顺势方（越过信号 K 极值才成交，说明有人先动手了）</td><td>趋势中的回调、旗形、区间很宽时在边界做反转。默认首选</td></tr>
+            <tr><td><b>限价单</b></td><td>逆势方（你在接刀）</td><td>只在很清晰的中等宽度区间里、上/下 1/3 的位置，且背景确定是震荡</td></tr>
           </tbody>
         </table>
-        <p style="font-size:12.5px;line-height:1.8;color:#475569;margin:14px 0 0">
-          <b>不改判的观察也要写下来。</b>否则复盘时回答不了「我当时为什么没看出来」——而这个问题的答案，通常就是漏记的那几条辅助证据。
-        </p>
-        <p style="font-size:12.5px;line-height:1.8;color:#475569;margin:10px 0 0">
-          一条纪律：持仓状态下不给自己改判的豁免权。持有多单时出现的 A1 证据，与空仓时看到的 A1 证据，权重必须相同。
-        </p>
+        <p style="margin-top:12px">大多数人亏钱是因为反了：<b>在趋势里用限价单抄底摸顶，在震荡里用 stop 单追突破。</b>这两种都是把钱直接递出去。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>二 · 止损必须和入场逻辑一致（知行合一）</h3>
+        <p>先问自己：<b>我这单到底在赌什么？</b>答案决定止损位置，不是反过来。</p>
+        <table class="rec">
+          <thead><tr><th style="width:220px">你的想法</th><th>止损该放哪</th><th>放错会怎样</th></tr></thead>
+          <tbody>
+            <tr><td>"趋势会恢复并创新高"</td><td>趋势起点 / 前一个重要波段低点 / 通道起点</td><td>放信号 K 低点 → 一个正常回调就把你打掉，然后你看着它走</td></tr>
+            <tr><td>"补完缺口就该恢复，逆势方没理由再推"</td><td>补完缺口那根 K 线的极值（可以很窄）</td><td>——这是唯一允许用窄止损的情形</td></tr>
+            <tr><td>"这里就是拐点，一根都不能再破"</td><td>信号 K 极值 / 双底下方</td><td>多数时候这个前提并不成立，你只是在赌运气</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:12px">反推法很实用：<b>先看你画的止损在哪，再问"这个止损实际上表达了什么"。</b>如果表达的是"不许有任何回调"，那和你"认为趋势会恢复"的判断是矛盾的。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>三 · 离场只有三种，没有"感觉不太好"</h3>
+        <ul class="tips">
+          <li><b>拿到目标位</b>：MM、AB=CD、回补某个特定缺口。多数利润来自这几笔拿到底的波段。</li>
+          <li><b>对手方出现明显的 MTR</b>（跌破趋势线 + 均线缺口 K + 回测极值失败 + 双顶/双底）：这时候才叫背景变了，可以主动走。</li>
+          <li><b>初始止损被触发</b>：说明判断错了，接受它。</li>
+        </ul>
+        <p style="margin-top:10px">"亏一点先跑"不属于上面任何一种。<b>浮亏不是离场理由，背景变化才是。</b>反过来，止损被打只说明一件事：你当时的背景判断错了，或者进场后背景已经变了。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>四 · 不做的六条（按出现频率排）</h3>
+        <div class="principles">
+          <div class="pr"><span class="n">1</span><span><b>背景说不清。</b>一句话讲不出"现在是趋势还是震荡"，就不要下单。等明确的突破或突破失败。</span></div>
+          <div class="pr"><span class="n">2</span><span><b>在区间中间。</b>中间进场，止损只能放到边界外，而边界正是人家要打的地方。胜率低、盈亏比差，多空都不好做。</span></div>
+          <div class="pr"><span class="n">3</span><span><b>左右都有缺口敞着。</b>多空各自的缺口都没补，说明谁也占不到便宜——通常是震荡或趋势暂歇。等一边先被补掉，再去押另一边。</span></div>
+          <div class="pr"><span class="n">4</span><span><b>一个明显的测量目标还没到。</b>离目标还很远的时候不要做反转，它很可能要先到目标位、再走个 MTR，才谈得上反转。</span></div>
+          <div class="pr"><span class="n">5</span><span><b>理由不足两个。</b>只有一个理由、或者只有一种"我觉得"，就不做。宁可错过——靠不合理的方式赚到的那一笔，以后会以更大的代价还回去。</span></div>
+          <div class="pr"><span class="n">6</span><span><b>盈亏比不够。</b>胜率 50–60% 的前提下，盈亏比至少要 1.5。算不出来目标位，就说明这笔单本来就不该开。</span></div>
+        </div>
+      </div>
+
+      <div class="card-static">
+        <h3>五 · 一个小技巧：看入场 K 有没有"造缺口"</h3>
+        <p>你用 stop 单进场后，紧接着的那根 K 线（入场 K）如果对信号 K 留下了微缺口，说明这一下是有共识的、有资金在推。<b>如果入场 K 完全没有对信号 K 造出缺口，这一笔大概率不是拐点</b>，可以考虑缩小、或者直接走。</p>
+        <p>反向验证也一样：如果第三根 K 线还没能把信号 K 之后的缺口敞开，这个入场点很可能选错了。这条不是绝对规则，但它能在盘中最快给你一个反馈。</p>
+      </div>
+
+      <div class="card-static">
+        <h3>六 · 一条纪律</h3>
+        <p>持仓状态下不给自己改判的豁免权。持有多单时出现的"空头造缺口、逆势方 stop 能赚钱"，与空仓时看到的同一现象，权重必须相同。仓位重到亏不起的时候，你不是在观察市场，你是在替自己辩护。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 状态地图 ================= -->
+  <section class="panel" id="panel-map">
+    <div class="doc">
+      <div class="doc-head">
+        <h2>五个结论，和它们之间唯一的通道</h2>
+        <p>这里的"状态"不是先验的分类，是缺口行为读出来的结果。每个结论下面写的不是定义，是<b>什么证据会让你换一个结论</b>。点右侧"去哪"可直接跳过去。</p>
+      </div>
+      <div class="card-static" id="mapTable"></div>
+      <div class="card-static">
+        <h3>三条隐藏规则</h3>
+        <div class="principles">
+          <div class="pr"><span class="n">↺</span><span><b>改判不是跳到对面，是回到②重扫缺口。</b>强趋势失效之后，更常见的下一步是宽通道或震荡，不是立刻反转。所有指向"回 ②"的箭头都是这个意思。</span></div>
+          <div class="pr"><span class="n">↓</span><span><b>单条只能降级，两条才改判。</b>一个缺口被补掉只是辅助证据，它只把"强趋势"降成"宽通道"；要改判，得有实体缺口被补 + 顺势方无法恢复这种组合。</span></div>
+          <div class="pr"><span class="n">⊘</span><span><b>"震荡"不是看出来的，是缺口被反复抹掉证明的。</b>进震荡的理由是：双向缺口都被回补、双向 stop 都能赚钱、边界各被测试 ≥2 次。不是"看起来在横"。</span></div>
+        </div>
       </div>
     </div>
   </section>
@@ -407,328 +717,521 @@
 
 <script>
 /* =========================================================
-   状态机数据
-   kind: q = 提问 · s = 状态 · n = 观察结论
+   节点定义
+   kind: p = 准备 · q = 提问 · s = 结论 · n = 判读/观察 · c = 核对
+   ev:   这一步产生的读盘证据（进右栏、进复制文本）
    ========================================================= */
 const FLOW = {};
-
+function P(id, cfg){ FLOW[id] = Object.assign({ kind:'p', tone:'slate' }, cfg); }
 function Q(id, cfg){ FLOW[id] = Object.assign({ kind:'q', tone:'blue' }, cfg); }
 function S(id, cfg){ FLOW[id] = Object.assign({ kind:'s' }, cfg); }
 function N(id, cfg){ FLOW[id] = Object.assign({ kind:'n', tone:'slate' }, cfg); }
+function C(id, cfg){ FLOW[id] = Object.assign({ kind:'c', tone:'amber' }, cfg); }
 
-/* ---------- 识别阶段 ---------- */
-
-Q('q1', {
-  label:'② 结构扫描',
-  tag:'② 结构扫描',
-  flag:'识别阶段',
-  title:'最近这一段，有没有明确的单方向推进？',
-  sub:'看一整段的高低点与波段，不看单根 K 线的强弱。',
-  why:'单方向推进 = 高低点持续推进、价格能突破左侧重要波段点。重叠较多、双向来回走的，直接进震荡支线。注意：这几根 K 线的强弱不算数，要看一整段。',
+/* ---------------------------------------------------------
+   ① 画
+   --------------------------------------------------------- */
+P('p1', {
+  label:'① 画图', tag:'① 画图', flag:'开盘前',
+  title:'先把能画的都画出来',
+  sub:'这一步画的东西，后面每一步都要用。不画，到价格真的砸下来的时候，你没有"叠加"可以凑。',
+  checklist:[
+    '<b>昨日高 / 低 / 收盘价</b> —— 尤其是那根好趋势 K 的收盘价，买收盘和卖收盘的人会在这里打平。',
+    '<b>昨日到现在还没被回补的缺口</b> —— 一个都别漏，每个缺口边上写一句"谁被套在这里"。',
+    '<b>通道线 / 趋势线</b> —— 三点触碰才画，画完先假设备用，等价格告诉你哪条有效。',
+    '<b>测量目标位</b> —— MM、AB=CD，能画的都画，画错不要紧，画少了才要紧。',
+    '<b>当日开盘价</b> —— 开盘就补上。'
+  ],
+  sect:'画完了，往下走',
+  listSect:'盘前要画的五样',
   opts:[
-    { main:'有：高低点持续推进，能突破左侧重要波段点', note:'波段之间重叠少，回调浅', to:'q2', go:'检查趋势质量' },
-    { main:'没有：重叠较多，来回双向走', note:'顶部底部都被反复摸过，没有净推进', to:'q5', go:'进入震荡支线' }
-  ]
+    { main:'图上已经有这些线了，开始读盘', note:'接下来只看最近几根 K 线的缺口', to:'q1', go:'② 扫缺口', ev:{ k:'①画图', v:'静态位已画：昨日高低收 / 未回补缺口 / 通道线 / MM' } }
+  ],
+  why:'为什么要先画？因为价格到位置的那一刻，你的注意力会全部被那一两根 K 线吃掉，临时去找一定找不到。这些位置也全都来自<b>已经成交过的地方</b>，不是我猜的顶和底——这是这套方法唯一允许的"提前"。'
+});
+
+/* ---------------------------------------------------------
+   ② 扫缺口
+   --------------------------------------------------------- */
+Q('q1', {
+  label:'② 扫缺口', tag:'② 扫缺口', flag:'只看最近 3–5 根',
+  title:'最近这几根 K 线，有没有留下缺口？',
+  sub:'先别管趋势、别管形态。只做一件事：把"前一根的高/低"和"这一根的低/高"对一下，中间有没有空出来一段。',
+  observe:'一根一根对：这一根的最低点，比上一根的最高点还高 → 向上缺口；这一根的最高点，比上一根的最低点还低 → 向下缺口。实体之间空出来了才算，别拿影线凑。',
+  opts:[
+    { main:'有缺口', note:'哪怕很窄的一个也算。记录它在哪两根 K 线之间', to:'q2', go:'看是谁造的', ev:{ k:'②缺口', v:'有缺口（待判方向）' } },
+    { main:'没有缺口，K 线全都重叠在一起', note:'内包、外包、十字星、长影线互相咬合', to:'qn', go:'这本身就是结论', ev:{ k:'②缺口', v:'没有缺口' } }
+  ],
+  why:'为什么要从这里开始？因为缺口是这套体系里唯一"非黑即白"的东西——有就是有，没有就是没有，不需要你判断"这里像不像趋势"。缺口代表位移被留下来了，没有缺口代表谁也没能套住谁。这一步就把"上帝视角"换成了"眼前这两根 K 线"。'
 });
 
 Q('q2', {
-  label:'③ 趋势质量',
-  tag:'③ 趋势质量',
-  flag:'识别阶段',
-  title:'顺势方是不是在持续推进？逆势方能不能赚到钱？',
-  sub:'整条路径里权重最高的一问。结构漂不漂亮，不如对手赚不赚钱。',
-  why:'逆势方能赚钱，说明双方优势正在接近。限价单在极值赚到钱，只说明有人愿意接；Stop 追进去还能赚，说明顺势方已经不敢防守——那是最强的信号。',
+  label:'② 谁造的', tag:'② 谁造的缺口', flag:'方向',
+  title:'这个缺口，是谁制造的？',
+  sub:'只比一件事：它和刚才那段推进的方向，是同向还是反向。',
+  observe:'找到造缺口的那根锚点 K 线（光头阴线 / 光脚阳线 / 长上影阴线 / 长下影阳线），看它被突破的方向。往上破 → 多头造的；往下破 → 空头造的。',
   opts:[
-    { main:'顺势强，逆势方难赚钱', note:'逆势的单子大多被套，追也追不动', to:'q3', go:'看缺口与跟随' },
-    { main:'逆势方能赚到钱', note:'哪怕只是限价单在极值成交并获利', to:'q4', go:'看回调深度' }
-  ]
+    { main:'顺势方造的', note:'涨的时候多头造、跌的时候空头造，而且还在往前推', to:'q3', go:'看缺口现在的状态', ev:{ k:'③谁造', v:'顺势方制造，并在推进' } },
+    { main:'逆势方造的', note:'回调 / 反弹这一段里，被压着打的那一方造出来的', to:'q6', go:'看它守不守得住', ev:{ k:'③谁造', v:'逆势方制造（背景受到挑战）' } },
+    { main:'两个方向都有缺口敞着', note:'上面有多头的缺口，下面有空头的缺口，都还没补', to:'n_both', go:'左右互搏', ev:{ k:'③谁造', v:'双向缺口同时敞开' } }
+  ],
+  why:'同一个缺口，谁造的意义完全相反。<b>顺势方造缺口 = 它在套别人</b>，是趋势强度的直接证据；<b>逆势方造缺口 = 它拿到了阶段优势</b>，说明它有目标位，趋势恢复要付出代价。这一步判错，后面全错。'
 });
 
 Q('q3', {
-  label:'③ 缺口与跟随',
-  tag:'③ 缺口与跟随',
-  flag:'识别阶段',
-  title:'缺口有没有保持敞开？顺势 K 线有没有连续跟随？',
-  sub:'缺口是趋势强度最直接的证据，比任何形态都可靠。',
-  why:'缺口保持敞开 + K 线连续跟随 = 突破或窄通道。缺口反复被回补，说明推动力不足，要退回弱趋势分支重新评估。',
+  label:'③ 缺口状态', tag:'③ 缺口现在的状态', flag:'核心一问',
+  title:'这个顺势缺口，现在还敞着吗？',
+  sub:'四档，从强到弱。选你此刻在图上真实看到的那一档，不要选"大概"。',
+  observe:'数它之后的 K 线：有几根碰回到缺口区域？是影线碰的还是实体碰的？只碰到引线区，还是连实体都进去了？',
   opts:[
-    { main:'是：缺口敞开着，K 线连续跟随', note:'实体饱满，收盘靠向极值', to:'s_trend', go:'确认为强趋势' },
-    { main:'否：缺口反复被回补，跟随变差', note:'重叠 K、内包 K 开始增多', to:'q4', go:'退回弱趋势分支' }
-  ]
+    { main:'敞着：连续 3 根以上没被碰过，价格还在推进', note:'缺口区域干净，价格一次都没回去', to:'q4', go:'检验逆势方', ev:{ k:'④状态', v:'缺口敞开 ≥3 根，未被触碰' } },
+    { main:'被补掉了，但补完马上又造出一个新的', note:'一个补一个，像台阶', to:'q3b', go:'是不是阶梯模式', ev:{ k:'④状态', v:'缺口被补，随即再制造新缺口' } },
+    { main:'实体缺口被补掉了，而且顺势方 3 根都没收回去', note:'连实体都被吃穿，这是逆势方能拿到的极限', to:'q5', go:'背景可能已经变了', ev:{ k:'④状态', v:'实体缺口被回补，顺势方未恢复' } },
+    { main:'差一点点没补完，就掉头走了', note:'差 1–2 个 tick，始终没能进去', to:'q4', go:'反向的强证据', ev:{ k:'④状态', v:'差一点没补完 → 有一方抢跑' } }
+  ],
+  why:'缺口的状态是"量"出来的，不是"感"出来的：<b>敞开 3 根以上</b>才算真的没被碰；<b>引线补</b>只是探一下；<b>实体补</b>才算被消耗；<b>实体都补不掉</b>说明对方已经力竭。第四种最容易被新手误读成"缺口失败了"，其实正好相反——连最后一个 tick 都推不进去，是它不想推了。'
+});
+
+Q('q3b', {
+  label:'③ 阶梯模式', tag:'③ 阶梯模式确认', flag:'弱趋势的指纹',
+  title:'是不是"每个缺口都被补"的阶梯？',
+  sub:'一个缺口被补不算什么。连着几个都被补，才是阶梯模式——这是弱趋势最典型的指纹。',
+  observe:'往前翻：最近三个缺口，有几个被完整回补了？逆势方在极值挂的限价单，是不是每次都能活着出来？',
+  opts:[
+    { main:'是：两三个都被补了，逆势方每次都能赚', note:'高低点还在抬高/降低，但每一步都被人吃回去', to:'s_channel', go:'判为宽通道', ev:{ k:'⑤模式', v:'阶梯模式：缺口逐个被回补' } },
+    { main:'不是：只有这一个被补，前面还有敞着的', note:'那说明只是被打了一下，没伤到', to:'q4', go:'继续检验', ev:{ k:'⑤模式', v:'非阶梯：其他缺口仍敞开' } }
+  ],
+  why:'阶梯模式的本质是 scale in 一直有效：逆势方在前低下面挂单、回补缺口时打平，每次都能赚一笔 scalp。当逆势方<b>稳定地</b>能赚钱，顺势方就是一到前高前低就止盈——这就是为什么它很快就会演变成一个震荡区间。'
 });
 
 Q('q4', {
-  label:'③ 回调深度',
-  tag:'③ 回调深度',
-  flag:'识别阶段',
-  title:'回调是不是较深？逆势方用 Stop 入场能不能获利？',
-  sub:'这一问决定落在「宽通道」还是「趋势减弱」。',
-  why:'回调超过前一段的 50%、持续时间很长，且逆势方追进去也能赚 → 宽通道。回调浅、很快被买回 → 只是趋势减弱，继续观察。',
+  label:'③ stop 检验', tag:'③ 用 stop 单验收', flag:'最硬的一条',
+  title:'逆势方用 stop 单追进去，能不能赚到钱？',
+  sub:'这是整条路径里最硬的一问。限价单在极值赚到钱只说明有人愿意接；追进去还能赚，才说明顺势方不敢防守。',
+  observe:'找最近一次逆势的反扑：在它的信号 K 极值外 1 tick 追进去，有没有走出 ≥1R 而且不被止损？赚到了 → 逆势方能赚；追一次套一次 → 不能赚。',
   opts:[
-    { main:'是：回调较深，逆势方 Stop 入场也能获利', note:'回调超过前一段 50%，或持续超过 20 根 K 线', to:'s_channel', go:'判为宽通道' },
-    { main:'否：回调浅，很快被买回，逆势方赚不到', note:'推动力在下降，但方向还没翻', to:'s_weak', go:'判为趋势减弱' }
-  ]
+    { main:'赚不到：追一次套一次', note:'逆势的单子大多被埋，缺口根本没被补', to:'s_strong', go:'判为强趋势', ev:{ k:'⑥stop', v:'逆势方 stop 赚不到 → 顺势方强' } },
+    { main:'能赚到，但赚得不多', note:'刚好到缺口 / 前一个极值就回头，赚一笔 scalp', to:'s_channel', go:'判为宽通道', ev:{ k:'⑥stop', v:'逆势方 stop 能小赚 → 有限的双向' } },
+    { main:'双向都能赚', note:'往上追也行，往下追也行', to:'s_range', go:'判为震荡', ev:{ k:'⑥stop', v:'双向 stop 都能赚 → 震荡' } },
+    { main:'都不好赚，K 线又挤成一团', note:'做多做空都被扫，K 线互相包含', to:'s_ttr', go:'铁丝网，不做', ev:{ k:'⑥stop', v:'双向都不好赚 + 严重重叠 → TTR' } }
+  ],
+  why:'为什么用 stop 而不用限价？因为<b>限价单进场的那一刻你是逆势方</b>——你能在极值成交，只证明那里有人接货，不证明趋势要停。而 stop 单进场的那一刻你是顺势方，你能全身而退，才证明对手方已经不敢守着这个位置了。这一步几乎不依赖主观判断，只有一个问题：赚没赚到。'
 });
 
 Q('q5', {
-  label:'② 震荡支线',
-  tag:'② 震荡支线',
-  flag:'识别阶段',
-  title:'有没有出现明显的双向交易特征？',
-  sub:'上下边界各被测试两次以上，两个方向的缺口都被快速回补。',
-  why:'双向特征包括：边界反复被测试、价格反复回到波段起点、突破后没有跟随。证据不足时宁可进「趋势减弱」等待，不要硬下结论。',
+  label:'③ 实体缺口之后', tag:'③ 实体缺口被补之后', flag:'背景切换点',
+  title:'实体缺口被补掉了。现在是谁在推进？',
+  sub:'实体缺口是逆势方能拿到的极限。补完之后，顺势方本该立刻恢复——没恢复，说明前提已经变了。',
+  observe:'看补完之后的三根 K 线：顺势方有没有收回去？有没有造出新的缺口？还是逆势方还在往前走？',
   opts:[
-    { main:'是：上下都在试探，边界逐渐清晰', note:'双向用限价单在极值都能赚', to:'q6', go:'区分 TTR 与普通区间' },
-    { main:'不确定：证据还不足', note:'宁可少做，也不猜', to:'s_weak', go:'进观察状态' }
-  ]
+    { main:'顺势方 3 根内收回去，还造出了新缺口', note:'极限之后再推，说明只是洗了一下', to:'s_channel', go:'降级为宽通道', ev:{ k:'⑦实体缺口', v:'补完即恢复并造新缺口 → 宽通道' } },
+    { main:'逆势方还在推，或者双向都留缺口', note:'顺势方不接了', to:'qrange', go:'去定边界', ev:{ k:'⑦实体缺口', v:'补完不恢复，逆势方继续推进' } },
+    { main:'顺势方勉强收回来，但很吃力，反复来回', note:'既没恢复也没反转', to:'s_weak', go:'先观察', ev:{ k:'⑦实体缺口', v:'恢复很勉强 → 观察' } }
+  ],
+  why:'"逆势方能拿到的最好结果就是回补实体缺口"——这句话反过来用就是判据：<b>补完实体缺口就应该恢复趋势</b>。如果连这个都做了还恢复不了，那回调的时间已经太长、幅度已经太深，这段行情按震荡准备。注意这里不需要"第三条证据"，这一条本身就足够重。'
 });
 
 Q('q6', {
-  label:'② TTR 判定',
-  tag:'② TTR 判定',
-  flag:'识别阶段',
-  title:'是不是紧密震荡（TTR / 铁丝网）？',
-  sub:'K 线严重重叠，几乎每根都被前一根包含，没有连续推进。',
-  why:'TTR 与普通震荡的交易方式完全不同：前者停手等突破，后者在边界做反转。这个区分直接决定今天还做不做。',
+  label:'③ 逆势缺口', tag:'③ 逆势方造了缺口', flag:'背景受挑战',
+  title:'逆势方造的缺口，守住了吗？',
+  sub:'逆势方能造缺口，说明它在这一段里套住了人、拿到了阶段优势——它现在是有目标位的。',
+  observe:'从缺口形成那根 K 线往后数：顺势方几根之内把它补掉的？还是它一直敞着、价格就在缺口那一边磨？',
   opts:[
-    { main:'是：K 线重叠严重，几乎没有方向', note:'每根都被前一根包住，影线来回扫', to:'s_ttr', go:'停止交易' },
-    { main:'否：是普通震荡，边界清晰可做反转', note:'边界处有明确的反转 K 线', to:'s_range', go:'按区间交易' }
-  ]
+    { main:'没守住：1–2 根内被顺势方补掉', note:'虚张声势，趋势还在', to:'q3', go:'回到趋势判读', ev:{ k:'⑧逆势缺口', v:'1–2 根即被回补 → 虚张声势' } },
+    { main:'守住了：敞开 3 根以上，价格在缺口这一侧', note:'逆势方有了立脚点', to:'q7', go:'去算它的目标位', ev:{ k:'⑧逆势缺口', v:'逆势缺口敞开 ≥3 根 → 有目标位' } }
+  ],
+  why:'这是最容易被忽略的一步。新手看到一根逆势大阴线就喊反转，看到它被迅速买回又改口说趋势还在——其实判断标准只有一个：<b>这个缺口活了几根 K 线</b>。活不过两根是噪音，活得下去才有资格谈目标位。'
 });
 
-/* ---------- 五个状态 ---------- */
-
-S('s_trend', {
-  label:'突破 / 窄通道',
-  mapClass:'g',
-  tone:'green',
-  title:'突破 / 窄通道',
-  tag:'市场状态',
-  sub:'缺口保持敞开、顺势 K 线连续跟随、逆势方难以获利。',
-  stance:'<b>可顺势持有</b> —— 唯一可以常规仓位顺势交易的状态。不要在回调里逆势抢反弹。',
-  sect:'接下来可能去哪',
-  exits:[
-    { w:'dec', to:'q1', name:'出现了决定性证据', desc:'逆向缺口敞开超 3 根 K 线 / 缺口被回补后 3 根无法收复 / 逆势方 Stop 入场也能赚', go:'回 ② 重判' },
-    { w:'sup', to:'s_weak', name:'只有辅助证据', desc:'回调变深、幅度递减、跟随变差、提前止盈', go:'降级为趋势减弱' },
-    { w:'none', to:'n_trend_ok', name:'一条都没有', desc:'缺口与跟随都还在，判断继续有效', go:'维持观察' }
-  ],
+Q('q7', {
+  label:'③ 逆势方目标', tag:'③ 逆势方的目标位', flag:'决定趋势能不能恢复',
+  title:'逆势方的目标位，到了没有？',
+  sub:'它的目标位只有这几种：AB=CD、MM、补掉前面某个缺口、补掉最后一个缺口。到之前，趋势不会轻易反转。',
+  observe:'用它的起跌/起涨点量一个 MM 或 AB=CD；再往前找最近的、还没被补的缺口。两个里取近的那个，看价格到没到。',
   opts:[
-    { w:'dec', main:'逆势方制造出缺口，并保持敞开超过 3 根 K 线', note:'不是一根针式的插针，而是实体缺口持续存在', to:'q1', go:'回 ② 重判' },
-    { w:'dec', main:'逆势方回补实体缺口后，顺势方连续 3 根以上无法收复', note:'这个位置已经从支撑变成阻力', to:'q1', go:'回 ② 重判' },
-    { w:'dec', main:'逆势方用 Stop 入场也能持续获利', note:'最强的一条。限价捡针只说明有人接，Stop 追进去还能赚说明对手不敢防守', to:'q1', go:'回 ② 重判' },
-    { w:'sup', main:'回调超过前一段的 50%，或持续超过 20 根 K 线', to:'s_weak', go:'降级为趋势减弱' },
-    { w:'sup', main:'新高 / 新低幅度递减（10 点 → 5 点 → 2 点）', to:'s_weak', go:'降级为趋势减弱' },
-    { w:'sup', main:'顺势 K 线跟随变差，重叠 K、内包 K 增多', to:'s_weak', go:'降级为趋势减弱' },
-    { w:'sup', main:'顺势方在重要前高前低提前止盈，未到测量目标就回撤', to:'s_weak', go:'降级为趋势减弱' },
-    { w:'none', main:'都没有，缺口与跟随都还在', note:'保持判断，但不要停止记录', to:'n_trend_ok', go:'维持观察' }
+    { main:'还没到', note:'不管它现在看起来多强，都别逆着它做', to:'s_wait', go:'不交易，等它到', ev:{ k:'⑨目标位', v:'逆势方目标位未到 → 等' } },
+    { main:'到了，而且顺势方开始出信号', note:'信号 K + 跟随 + 造出缺口，三样占两样', to:'s_resume', go:'趋势恢复，最好的做单位置', ev:{ k:'⑨目标位', v:'目标位已到 + 顺势方出信号 → 可恢复' } },
+    { main:'到了，还在继续推，顺势方不接', note:'目标完成还不收手，那就是背景真的变了', to:'qrange', go:'去定边界', ev:{ k:'⑨目标位', v:'目标位已到仍继续推进 → 背景改变' } }
   ],
-  why:'对应 ZPA.md 6.5 与 2.5-A。决定性证据任一条成立即改判；只有辅助证据时只降级，累计两条以上才按决定性处理。'
+  why:'这一段是整套方法里最值钱的一句：<b>趋势中的回调，本质是双方在争夺目标位。</b>逆势方造了缺口，就有了自己的目标；没到目标之前，它没有理由收手。真正的拐点往往不是叠加最多、信号最漂亮的那个位置，而是<b>逆势方目标位完成后、优势开始衰竭</b>的那个位置——那时它把主动权交还给了顺势方。'
+});
+
+Q('qrange', {
+  label:'③ 定边界', tag:'③ 震荡的边界在哪', flag:'能不能指出来',
+  title:'边界能不能指出来？',
+  sub:'震荡的边界只能是已经成交过的地方：前高低、缺口边缘、昨日高低、当日开盘、测量目标位。指不出来的，不叫边界。',
+  observe:'在图上圈出上下两条带。如果这两条带你说不出"它来自哪根 K 线 / 哪个缺口"，那就是没有边界，不是窄区间。',
+  opts:[
+    { main:'能，而且价格现在在下面 1/3 或上面 1/3', note:'可以准备做反转了', to:'s_range', go:'按区间打', ev:{ k:'⑩边界', v:'边界清晰，价格在 1/3 区' } },
+    { main:'能，但价格正在中间', note:'这个位置做多做空都容易被夹', to:'n_middle', go:'不动', ev:{ k:'⑩边界', v:'边界清晰，但价格在中间' } },
+    { main:'指不清：全是重叠、十字星、内包外包', note:'铁丝网，谁进去谁被扫', to:'s_ttr', go:'不做', ev:{ k:'⑩边界', v:'边界指不清 → TTR' } }
+  ],
+  why:'为什么强调"指得出来"？因为区间中间进场，你的止损只能放在边界外，而边界恰恰是人家要去打的位置——先打掉你的止损，再回到另一边。这就是"怎么做都不对"的来源。所以要么在 1/3 区、要么不做，没有第三种。'
+});
+
+Q('qn', {
+  label:'② 没有缺口', tag:'② 一根缺口都没有', flag:'这本身就是结论',
+  title:'一根缺口都没有。这已经是答案了。',
+  sub:'没有缺口 = 没有位移被留下来 = 谁也没能套住谁。这时候去猜方向，就是在猜。',
+  observe:'看这些重叠的 K 线有没有围出上下两条边；如果连边都围不出来，那就只是挤在一起。',
+  opts:[
+    { main:'但价格确实在两条明确的边之间来回', note:'前高低、缺口边缘都画得出来', to:'s_range', go:'按震荡处理', ev:{ k:'②无缺口', v:'无缺口，但有明确边界 → 震荡' } },
+    { main:'边也看不出来，小 K 线挤成一团', note:'幅度越来越小，影线越来越长', to:'s_ttr', go:'不交易', ev:{ k:'②无缺口', v:'无缺口且无边界 → TTR' } },
+    { main:'一边还有很大的目标位没走完', note:'比如一个明显的 MM 还没到', to:'s_wait', go:'等它走完再说', ev:{ k:'②无缺口', v:'无缺口，但有未完成的目标位' } }
+  ],
+  why:'新手最怕"看不懂"，其实"看不懂"是很正常的读盘结论。<b>无法制造缺口，本身就是弱的表现</b>——它意味着这一段里没有任何一方能暂时性地把对方套住。承认这一点，比硬套一个"趋势"或"震荡"的标签有用得多。'
+});
+
+/* ---------------------------------------------------------
+   结论卡
+   --------------------------------------------------------- */
+S('s_strong', {
+  label:'强趋势（突破/窄通道）', mapClass:'g', tone:'green',
+  title:'强趋势：缺口敞着，逆势方追不进去',
+  tag:'结论', flag:'可以做，只做一个方向',
+  sub:'顺势方还能造缺口，缺口还没被碰，逆势方用 stop 追一次套一次。',
+  stance:'<b>只顺势。</b>80% 的反转都是小反转——逆势的单子信号再漂亮也不做，宁可错过。',
+  play:{
+    entry:'等回调：M2B / M2S（两腿回调到 EMA 附近 + 第二个信号 K）、旗形（牛旗/熊旗）突破。不追已经离缺口很远的价位。',
+    stop:'这段推进的起涨 / 起跌点，或前一个重要波段低点。不是信号 K 的低点——除非那真的是趋势前提。',
+    target:'MM（用被突破前的波段高低点量）、AB=CD、下一个缺口。多个目标取最近的那个。'
+  },
+  sect:'什么时候改判',
+  exits:[
+    { w:'dec', to:'q6', name:'逆势方造出缺口，并且敞开 3 根以上', desc:'这是背景受挑战的第一信号，立刻去算它的目标位', go:'去算逆势方目标' },
+    { w:'dec', to:'q5', name:'实体缺口被补掉，顺势方 3 根没收回去', desc:'逆势方拿到了它能拿到的极限，而且趋势没恢复', go:'看谁在推进' },
+    { w:'sup', to:'s_channel', name:'缺口开始被逐个回补，逆势方在极值能赚到', desc:'单条只降级。降成宽通道，不是反转', go:'降级为宽通道' },
+    { w:'none', to:'n_hold', name:'都没有：缺口还敞着，逆势 stop 还是不赚', desc:'判断继续有效，但不要停止记录', go:'维持' }
+  ],
+  why:'强趋势里最容易犯的错是"这里涨太多了，该回调了"。这句话不可否证，所以不是证据。<b>能否证的是：缺口补了没有、逆势方 stop 赚没赚到。</b>这两个没变，趋势就没变。'
 });
 
 S('s_channel', {
-  label:'宽通道 / 倾斜震荡',
-  mapClass:'a',
-  tone:'amber',
-  title:'宽通道 / 倾斜震荡',
-  tag:'市场状态',
-  sub:'通道内仍有方向，但回调更深，逆势方也能获利。',
-  stance:'<b>可以做，但要降预期</b> —— 止损放宽、仓位下调，尤其别在通道上沿追多。',
-  sect:'接下来可能去哪',
+  label:'宽通道 / 阶梯模式', mapClass:'a', tone:'amber',
+  title:'宽通道：收支两条线，双向但偏顺势',
+  tag:'结论', flag:'能做，但要降预期',
+  sub:'高低点还在抬（降），但每个缺口都被回补，逆势方在极值挂单每次都能赚。',
+  stance:'<b>可以做，只做顺势那一边，仓位和预期都下调。</b>止损放宽，目标拿到最近的那个缺口/前极值就走，别幻想 MM。',
+  play:{
+    entry:'等回调到通道边 + 叠加位置，用 stop 单。别在通道中部追——那里是双向都会被夹的位置。',
+    stop:'通道起点，或前一个重要波段点（宽止损）。这个状态下窄止损几乎必被打。',
+    target:'最近的缺口 / 前高前低。先拿一笔，别想一口吃成 MM。'
+  },
+  sect:'什么时候改判',
   exits:[
-    { w:'dec', to:'q1', name:'出现反转证据', desc:'MTR 四件套齐备 / 更低高点 + 更低低点，且反攻无力', go:'回 ② 重判' },
-    { w:'dec', to:'q5', name:'出现双向证据', desc:'双向缺口快速回补 / 边界各测 ≥2 次 / 双向 Stop 都能赚', go:'转震荡' },
-    { w:'none', to:'n_channel_ok', name:'都没有', desc:'回调依然被买回 / 卖回，通道边界依然有效', go:'保持宽通道' }
+    { w:'dec', to:'qrange', name:'双向 stop 都能赚，上下边界各被测试 ≥2 次', desc:'已经不是弱趋势，是真震荡了', go:'去定边界' },
+    { w:'dec', to:'q1', name:'MTR 四件套齐备', desc:'跌破趋势线 + 均线缺口 K + 回测极值失败 + 双顶/双底', go:'回 ② 重扫' },
+    { w:'dec', to:'q5', name:'实体缺口被补后仍不恢复，开始反向造缺口', desc:'通道可能要变成反向趋势', go:'看谁在推进' },
+    { w:'none', to:'n_hold', name:'回调依然被买回 / 卖回，缺口继续被补', desc:'保持宽通道，不做调整', go:'维持' }
   ],
-  opts:[
-    { w:'dec', main:'MTR 四件套齐备：趋势线被有效突破 + EMA20 均线缺口 K + 回测原极值失败 + 双顶/双底', note:'四项同时出现，视为反转开始', to:'q1', go:'回 ② 重判' },
-    { w:'dec', main:'结构方向已反向确立：更低高点 + 更低低点，且反攻无力', to:'q1', go:'回 ② 重判' },
-    { w:'dec', main:'上下方向的缺口都被快速回补，价格长时间滞留通道中部', note:'通道已经失去方向性，实质是震荡', to:'q5', go:'转震荡' },
-    { w:'dec', main:'上下边界各被测试 ≥2 次，每次都出现有效反转 K 线', to:'q5', go:'转震荡' },
-    { w:'dec', main:'双向用 Stop 入场都能获利，而不只是限价单能赚', note:'这是双向环境的直接证据', to:'q5', go:'转震荡' },
-    { w:'none', main:'回调依然被买回 / 卖回，通道边界依然有效', to:'n_channel_ok', go:'保持宽通道' }
+  why:'宽通道只有两条演化路径：反转（MTR 成立）或转成震荡。它<b>不会自己原地变强</b>。所以在这个状态里，你要做的不是期待突破，而是每一次都按"这大概是最后一次"来拿利润。'
+});
+
+S('s_resume', {
+  label:'趋势恢复（逆势方目标已完成）', mapClass:'g', tone:'green',
+  title:'趋势恢复：逆势方理由用完了',
+  tag:'结论', flag:'这是最划算的一档',
+  sub:'逆势方到了自己的 MM / 补完了缺口，然后顺势方给出了信号 K + 跟随。它没有理由再推了。',
+  stance:'<b>可以按正常仓位做，这是全套方法里最好的位置。</b>它同时满足：背景没坏、逆势方理由耗尽、顺势方已经动手。',
+  play:{
+    entry:'stop 单，越过信号 K 的极值。也可以等二次入场（更便宜，胜率更高）。',
+    stop:'这里可以窄：信号 K 极值 / 双底下方。因为逆势方目标已完成，再破就说明前提失效了——这是少数允许窄止损的情形。',
+    target:'回到前高 / 前低，然后是 MM。先看最近的那个。'
+  },
+  sect:'入场后立刻验证',
+  exits:[
+    { w:'chk', to:'n_take', name:'入场 K 对信号 K 造出了缺口', desc:'有共识、有资金在推，这一笔是对的', go:'按计划持有' },
+    { w:'chk', to:'n_bad', name:'入场 K 完全没有造缺口，第三根也没敞开', desc:'大概率不是拐点，缩小或直接走', go:'认错离场' },
+    { w:'sup', to:'s_wait', name:'逆势方又往前推了一段', desc:'目标位算错了，重新量一次', go:'回去等' },
+    { w:'none', to:'n_hold', name:'还在原位磨，没给出方向', desc:'不动，等它自己表态', go:'维持' }
   ],
-  why:'对应 ZPA.md 2.5-B。宽通道只有两条演化路径：反转（MTR 成立）或转成震荡。没有第三条——它不会自己原地变强。'
+  why:'为什么这一档比"强趋势里追回调"更好？因为你的止损更近、理由更硬。<b>强趋势里你在赌趋势延续，这里你在赌逆势方已经没牌了</b>——后者是可以被指出来、也可以被否证的。'
 });
 
 S('s_range', {
-  label:'普通震荡区间',
-  mapClass:'a',
-  tone:'amber',
-  title:'普通震荡区间',
-  tag:'市场状态',
-  sub:'双向交易环境，边界相对清晰。',
-  stance:'<b>在边界附近做反转</b> —— 不在中间进场。观察顶部、底部，以及突破失败后的回落。',
-  sect:'接下来可能去哪',
+  label:'震荡区间', mapClass:'a', tone:'amber',
+  title:'震荡区间：在 1/3 区做反转，中间不动',
+  tag:'结论', flag:'80% 的突破是假的',
+  sub:'双向都能赚，边界指得出来，缺口造了就被补。',
+  stance:'<b>只在上 1/3 和下 1/3 做反转，中间一律不动。</b>不管它看起来多想突破，都先假设它会失败——你可以不做，但不能押它成功。',
+  play:{
+    entry:'宽区间用 stop 单等信号 K 出现在边界；中等区间可以在极值外侧一点挂限价单，但只在上/下 1/3。',
+    stop:'不要刚好放在边界外 1 tick——那是人家要扫的地方。放到结构外，或区间宽度的 1/2 之外。',
+    target:'对面边界，或最近的缺口。到不了就拿着，别在中间猜。'
+  },
+  sect:'什么时候改判',
   exits:[
-    { w:'dec', to:'q1', name:'区间被有效离开', desc:'离开边界 + 获得跟随 + 缺口保持敞开', go:'回 ② 重判' },
-    { w:'dec', to:'n_range_hold', name:'突破失败，区间延续', desc:'返回区间并出现双顶 / 双底 / 楔形 / 外包 K', go:'维持区间' },
-    { w:'dec', to:'n_range_widen', name:'边界被拓宽', desc:'双向特征依然完整，只更新边界坐标', go:'更新坐标' },
-    { w:'none', to:'n_range_hold', name:'仍在区间内测试边界', desc:'没有离开，也没有走出反向结构', go:'维持区间' }
+    { w:'dec', to:'q1', name:'离开边界 + 获得跟随 + 缺口保持敞开', desc:'三个同时满足才算突破，缺一个都还是区间', go:'回 ② 重扫' },
+    { w:'dec', to:'n_trap', name:'在边界造了缺口，但很快收回区间', desc:'第二段陷阱 / 诱多诱空，区间更硬了', go:'这是陷阱' },
+    { w:'dec', to:'n_widen', name:'边界被拓宽，但双向特征没变', desc:'只更新坐标，不改类别', go:'更新坐标' },
+    { w:'none', to:'n_hold', name:'还在区间里测试边界', desc:'没有离开，也没有走出反向结构', go:'维持' }
   ],
-  opts:[
-    { w:'dec', main:'价格离开边界并获得跟随，缺口保持敞开', note:'离开 + 跟随 + 缺口敞开，三个条件同时满足才算', to:'q1', go:'回 ② 重判' },
-    { w:'dec', main:'突破失败返回区间，并出现反向结构：双顶、双底、楔形、外包 K', note:'区间延续，仍然有效', to:'n_range_hold', go:'区间延续' },
-    { w:'dec', main:'边界被拓宽，但双向特征依然完整', note:'只更新边界坐标，不改变类别', to:'n_range_widen', go:'更新坐标' },
-    { w:'none', main:'仍在区间内测试边界，没有离开', to:'n_range_hold', go:'维持区间' }
-  ],
-  why:'对应 ZPA.md 2.5-D。注意：边界被拓宽不是类别改变，别把「区间变大了」误读成「趋势要来了」。'
+  why:'"不管尝试了多少次突破，都默认它还会继续震荡"——这句话是纪律，不是预测。因为你一旦押了一次突破成功并亏了，你会接着押第二次、第三次。这才是震荡区间真正的杀手：<b>不是判断错，是不肯接受它就是震荡。</b>'
 });
 
 S('s_ttr', {
-  label:'紧密震荡 TTR',
-  mapClass:'r',
-  tone:'red',
-  title:'紧密震荡（TTR）',
-  tag:'市场状态',
-  sub:'K 线严重重叠，没有方向性推进。',
-  stance:'<b>停止交易</b> —— 做多做空都容易被扫。正确动作是等突破，再用跟随情况判真假。',
-  sect:'接下来可能去哪',
+  label:'铁丝网 / TTR', mapClass:'r', tone:'red',
+  title:'铁丝网：这时候唯一正确的动作是不做',
+  tag:'结论', flag:'停手',
+  sub:'K 线互相包含，上下影线很长，缺口造不出来，双向 stop 都被扫。',
+  stance:'<b>不交易。</b>这种区域里只有限价单能赚到钱，用 stop 单的人会一直吃亏。等它自己走出边界。',
+  play:{
+    entry:'等突破：连续 2–3 根趋势 K + 缺口不回补 + 回踩不重新进入区间。三条同时满足才算。',
+    stop:'——',
+    target:'——'
+  },
+  sect:'什么时候再看',
   exits:[
-    { w:'dec', to:'q1', name:'突破有效', desc:'2–3 根趋势 K + 缺口不回补 + 回踩不重新进入区间', go:'重判' },
-    { w:'dec', to:'n_fake', name:'假突破', desc:'1–2 根内回到区间，且没有跟随', go:'仍是 TTR' },
-    { w:'none', to:'n_ttr_wait', name:'仍在区间内', desc:'没有突破，继续等', go:'不做' }
+    { w:'dec', to:'q1', name:'突破后连续 2–3 根趋势 K，缺口没被回补', desc:'回踩也没有重新进入区间内部', go:'回 ② 重扫' },
+    { w:'dec', to:'n_fake', name:'突破后 1–2 根就回到区间', desc:'假突破，仍然是 TTR', go:'仍是铁丝网' },
+    { w:'none', to:'n_wait', name:'还在里面挤', desc:'继续等，不做', go:'继续等' }
   ],
-  opts:[
-    { w:'dec', main:'突破后连续 2–3 根趋势 K，实体饱满、收盘靠近极值', note:'同时缺口不回补、回踩没有重新进入区间内部', to:'q1', go:'有效突破，重判' },
-    { w:'dec', main:'突破后 1–2 根 K 线内回到区间，且没有跟随', note:'假突破，仍然是 TTR', to:'n_fake', go:'仍是 TTR' },
-    { w:'none', main:'仍在区间内，没有突破', to:'n_ttr_wait', go:'继续等' }
+  why:'TTR 里最贵的教训是"第二次突破看起来更强"。<b>看起来更强不等于会成功</b>——它往往就是用来把追突破的人埋在顶底的那一下。判断标准永远不是力度，而是"有没有真正离开 + 有没有跟随 + 缺口留没留下"。'
+});
+
+S('s_wait', {
+  label:'等逆势方目标位', mapClass:'s', tone:'slate',
+  title:'等：逆势方的目标位还没到',
+  tag:'结论', flag:'不做',
+  sub:'它有自己的 MM / 缺口要补，没到之前它没有理由收手。',
+  stance:'<b>不交易。</b>现在进去，不管做哪一边，都是在替它抬轿。你要做的是把目标位画出来，然后等价格自己走到那里。',
+  play:{
+    entry:'等目标位到达后，出现信号 K + 跟随 + 造出缺口，再考虑顺势恢复（→ 趋势恢复）。',
+    stop:'——',
+    target:'先把逆势方的 MM / AB=CD / 待补缺口画出来，这就是你的地图。'
+  },
+  sect:'什么时候再看',
+  exits:[
+    { w:'dec', to:'s_resume', name:'目标位到了，顺势方开始出信号', desc:'信号 K + 跟随 + 造缺口，这是最好的位置', go:'做趋势恢复' },
+    { w:'dec', to:'qrange', name:'到了还在继续推，顺势方不接', desc:'背景已经变了，去定边界', go:'去定边界' },
+    { w:'dec', to:'q1', name:'顺位方提前发力，重新造出缺口并敞开', desc:'它不肯让到目标位，那就回 ② 重扫', go:'回 ② 重扫' },
+    { w:'none', to:'n_wait', name:'还在往目标位走', desc:'继续等，记录它走到了哪', go:'继续等' }
   ],
-  why:'对应 ZPA.md 2.3 与 2.5-C。特别注意第二段陷阱：<b>第二次突破看起来更强，不等于会成功</b>。不要因为突破力度大就改判。'
+  why:'"市场是有节奏的"——这句话的实际含义就是：<b>它大概率要到了目标位、再走个 MTR，才谈得上反转。</b>你急着进去，就是在赌它提前收手，而这个概率并不站在你这边。'
 });
 
 S('s_weak', {
-  label:'趋势减弱，观察中',
-  mapClass:'s',
-  tone:'slate',
-  title:'趋势减弱，继续观察',
-  tag:'市场状态',
-  sub:'这是一个等待状态，本身没有方向。',
-  stance:'<b>仓位压到最小，不反向</b> —— 它不该长期停留，只有两个出口。',
-  sect:'接下来可能去哪',
+  label:'背景不明（观察）', mapClass:'s', tone:'slate',
+  title:'观察：既没恢复，也没反转',
+  tag:'结论', flag:'仓位最小或不参与',
+  sub:'这是等待状态，本身没有方向。它不该长期停留。',
+  stance:'<b>不反向，仓位压到最小。</b>只有两个出口：回到趋势，或者转成震荡。',
+  play:{
+    entry:'等确定性：要么顺势方重新造出缺口并保持敞开，要么双向边界确立。',
+    stop:'——',
+    target:'——'
+  },
+  sect:'什么时候再看',
   exits:[
-    { w:'dec', to:'q1', name:'回到趋势，或第二条辅助证据', desc:'顺势方重新制造并保持缺口、回调变浅；或再出现一条辅助证据（累计两条）', go:'回 ② 重判' },
-    { w:'dec', to:'q5', name:'双向边界确立', desc:'顶底各测 ≥2 次，两个方向的 Stop 都能获利', go:'转震荡' },
-    { w:'none', to:'s_range', name:'超时，仍无出口', desc:'超过 20 根 K 线没有方向', go:'按震荡处理' }
+    { w:'dec', to:'q1', name:'顺势方重新造缺口并保持敞开，回调变浅', desc:'回到趋势了，回 ② 确认', go:'回 ② 重扫' },
+    { w:'dec', to:'qrange', name:'双向边界确立，各被测试 ≥2 次', desc:'转震荡', go:'去定边界' },
+    { w:'none', to:'n_wait', name:'超过 20 根 K 线还没有出口', desc:'按震荡或 TTR 处理，空仓', go:'按震荡处理' }
   ],
-  opts:[
-    { w:'dec', main:'顺势方重新制造缺口并保持敞开，回调变浅，逆势方再次难以获利', note:'重回趋势，回 ② 确认', to:'q1', go:'回趋势' },
-    { w:'dec', main:'双向边界确立：顶底各被测试 ≥2 次，且双向 Stop 都能获利', note:'转震荡的直接证据', to:'q5', go:'转震荡' },
-    { w:'dec', main:'又出现了一条辅助证据（累计两条）', note:'单条只降级，两条共振按决定性处理', to:'q1', go:'回 ② 重判' },
-    { w:'none', main:'超过 20 根 K 线仍无出口', note:'超过时限，按震荡或 TTR 处理并空仓', to:'s_range', go:'按震荡处理' }
+  why:'这个状态的价值是<b>承认自己还没看懂</b>。它存在的时间越短越好——如果它一直不结束，那说明你缺的不是判断，而是某一条还没被记录下来的证据。'
+});
+
+/* ---------------------------------------------------------
+   判读 / 核对卡
+   --------------------------------------------------------- */
+N('n_both', {
+  label:'左右互搏', tag:'判读', title:'两边都有缺口敞着：不交易',
+  sub:'多头自己的缺口还没补，空头那边的缺口也还敞着。这说明谁也占不到便宜，通常在震荡里，或者是趋势的暂歇。',
+  tips:[
+    '<b>不要选边。</b>这时候任何一边的"看起来更强"都是错觉，因为你缺一个比较基准。',
+    '<b>等一边先被补掉。</b>谁先被补，就往另一边押——这是这套方法里最实用的一个等待条件。',
+    '<b>如果是趋势中的回调：</b>去算逆势方的目标位，它补完缺口之后大概率就收手了（→ 趋势恢复）。'
   ],
-  why:'对应 ZPA.md 2.5-E。这个状态的作用是被动等待，出口只有两个：回到趋势，或者转成震荡。'
+  back:'q1'
 });
 
-/* ---------- 观察结论 ---------- */
-
-N('n_trend_ok', {
-  label:'维持 · 仍为强趋势', tag:'观察', title:'维持：判断继续有效',
-  sub:'没有任何失效证据出现。保持原判断。',
-  tips:['不要停止记录。<b>没有改判的观察也要写下来</b>，否则复盘时回答不了「我当时为什么没看出来」。','每 5 根 K 线或每次关键事件记一行：证据、类别、原判断、新判断。'],
-  back:'s_trend'
+N('n_middle', {
+  label:'中间位置', tag:'判读', title:'价格在区间中间：不动',
+  sub:'这不是"再等等看"的位置，是"这张图现在没有交易机会"的位置。',
+  tips:[
+    '中间进场，止损只能放到边界外，而边界正是人家要打的地方——先扫你，再回头。',
+    '你要做的不是找理由进场，是等价格走到 1/3 区。<b>等待本身就是一个仓位。</b>',
+    '如果区间很窄（每两三根 K 线就有一次反转），那另说；但那种区间的盈亏比也很差。'
+  ],
+  back:'qrange'
 });
 
-N('n_channel_ok', {
-  label:'维持 · 仍为宽通道', tag:'观察', title:'维持：通道边界仍然有效',
-  sub:'回调依然被买回 / 卖回，没有走到反转或震荡。',
-  tips:['宽通道的默认动作是「减预期继续做」，不是空仓也不是加仓。','盯住两件事：MTR 是否开始成形，双向缺口是否都被快速回补。'],
-  back:'s_channel'
+N('n_hold', {
+  label:'维持原判断', tag:'判读', title:'维持：没有任何失效证据',
+  sub:'缺口还在，逆势方还是赚不到，原判断继续有效。',
+  tips:[
+    '<b>没有改判的观察也要记下来。</b>否则复盘时你回答不了"我当时为什么没看出来"——答案通常就是那些漏记的辅助证据。',
+    '每 5 根 K 线或每次关键事件记一行：时间 / 看到什么 / 缺口状态 / 原判断 / 新判断。',
+    '持仓时给自己记一条：现在这条证据，如果我是空仓，我会怎么看？'
+  ],
+  back:'q1'
 });
 
-N('n_range_hold', {
-  label:'区间延续', tag:'观察', title:'区间延续，类别不变',
-  sub:'突破失败并返回区间，出现反向结构。区间仍然有效。',
-  tips:['继续在边界做反转，不在中间进场。','如果出现双顶/双底/楔形/外包 K，说明边界处有明确的对手盘，可提高该边界的权重。'],
+N('n_take', {
+  label:'入场 K 造缺口了', tag:'验证', title:'对：入场 K 对信号 K 造出了缺口',
+  sub:'这说明这一下是有共识的，有资金在同一个位置动手。',
+  tips:[
+    '按计划持有，把离场条件先想好：目标位 / MTR / 初始止损，只有这三种。',
+    '<b>不要因为浮盈回吐就提前走。</b>大部分利润来自那几笔拿到目标位的单子。',
+    '如果后面出现了反向的缺口并敞开 3 根以上，那才是背景变了，可以主动离场。'
+  ],
+  back:'s_resume'
+});
+
+N('n_bad', {
+  label:'入场 K 没造缺口', tag:'验证', title:'可疑：入场 K 没有造出缺口',
+  sub:'你的 stop 单成交了，但紧接着那根 K 线没有对信号 K 留下微缺口。',
+  tips:[
+    '这条不是绝对规则，但它是有概率的：<b>没有造缺口的入场 K，说明没人抢，这一笔很可能不是拐点。</b>',
+    '处理方式二选一：缩小仓位按原止损扛，或者直接平掉等二次入场。',
+    '如果第三根 K 线还没能把缺口敞开，基本可以确认这个位置选错了。'
+  ],
+  back:'s_resume'
+});
+
+N('n_trap', {
+  label:'第二段陷阱', tag:'判读', title:'这是陷阱：边界处的缺口是给你追的',
+  sub:'区间底部向下造缺口 ≈ 诱空；区间顶部向上造缺口 ≈ 诱多。',
+  tips:[
+    '判别要点：<b>这个缺口出现在区间的哪个位置、这一段已经跑了几腿。</b>越靠近边界、跑得越久，越可能是收割。',
+    '这种缺口通常是"捷径型"的——价格赶着去某个位置，不是真的要开启新趋势。',
+    '正确动作：不追，等它失败回到区间，再在反方向找机会。'
+  ],
   back:'s_range'
 });
 
-N('n_range_widen', {
-  label:'更新边界坐标', tag:'观察', title:'只更新坐标，不改类别',
-  sub:'边界被拓宽，但双向特征依然完整。',
-  tips:['把新的高低点记进坐标里，其余判断不动。','警惕一种误读：区间变大不等于趋势要来了。'],
+N('n_widen', {
+  label:'更新坐标', tag:'判读', title:'只更新坐标，不改类别',
+  sub:'边界被拓宽了，但双向特征依然完整。',
+  tips:[
+    '把新的高低点记进坐标，其余判断不动。',
+    '警惕一种误读：<b>区间变大，不等于趋势要来了。</b>',
+    '震荡日很常见的一种走法：在一个位置震完，突破一小段，再换一个位置接着震。'
+  ],
   back:'s_range'
-});
-
-N('n_ttr_wait', {
-  label:'等突破', tag:'观察', title:'继续等，不做',
-  sub:'仍在区间内，没有突破。TTR 里的正确动作是不交易。',
-  tips:['等的是「离开区间 + 跟随 + 缺口敞开」，不是「有一根大 K 线」。','记录每一根接近边界的 K 线，突破那天你会需要这些前情。'],
-  back:'s_ttr'
 });
 
 N('n_fake', {
-  label:'假突破 · 仍是 TTR', tag:'观察', title:'假突破，仍按 TTR 处理',
-  sub:'突破后 1–2 根就回到区间，且没有跟随。',
-  tips:['<b>第二段陷阱：第二次突破看起来更强，不等于会成功。</b>仍以「是否真正离开区间 + 有无跟随」为准。','假突破之后往往跟随一次方向相反的真突破，但不要提前埋伏，等它自己走出来。'],
+  label:'假突破', tag:'判读', title:'假突破，仍然按 TTR 处理',
+  sub:'突破后 1–2 根就回到区间，没有跟随，也没有留下缺口。',
+  tips:[
+    '<b>第二次突破看起来更强，不等于会成功。</b>仍以"是否真正离开 + 有无跟随 + 缺口留没留下"为准。',
+    '假突破之后往往跟着一次反方向的真突破，但不要提前埋伏，等它自己走出来。',
+    '这段时间最该做的是记录：假突破的位置，就是下一次真突破要越过的门槛。'
+  ],
   back:'s_ttr'
 });
 
-/* note 卡自动补一个返回选项 */
+N('n_wait', {
+  label:'继续等', tag:'观察', title:'继续等，不做',
+  sub:'条件还没到。等不是消极，等是这个策略的一部分。',
+  tips:[
+    '把"等什么"写下来：等目标位到达 / 等 1/3 区 / 等一边缺口先被补 / 等突破后跟随。写不出来的等待，会变成随意开仓。',
+    '一天里挑得出一两单就够了。挑不出来，说明今天就是没有。',
+    '进场理由不足时，宁可错过——靠不合理的方式赚到的那一笔，以后会连本带利还回去。'
+  ],
+  back:'q1'
+});
+
+C('c_check', {
+  label:'开单前核对', tag:'开单前', flag:'五问',
+  title:'五问，有一个是"不"就不打',
+  sub:'这五问不是流程，是刹车。',
+  observe:'回答时不要说"应该"、"大概"。每一问都要能指到图上的具体位置。',
+  listSect:'五个问题',
+  checklist:[
+    '<b>背景清楚吗？</b>一句话说得出现在是趋势还是震荡，说不清就不打。',
+    '<b>几个理由？</b>至少两个能说出口的（背景 + 位置，最好再加一个形态）。',
+    '<b>止损放哪？它表达什么？</b>是"趋势前提失效"，还是"不许有任何回调"？后者和"趋势会恢复"是矛盾的。',
+    '<b>目标位在哪，盈亏比多少？</b>1:1.5 起步。算不出来目标，这笔单本来就不该开。',
+    '<b>这是顺势还是逆势？</b>逆势的话，逆势方的目标位到了吗？'
+  ],
+  sect:'结果',
+  opts:[
+    { main:'五个都过', note:'可以打了', to:'n_go', go:'执行', ev:{ k:'⑫核对', v:'五问通过 → 执行' } },
+    { main:'有一个不过', note:'记录理由，然后不做', to:'n_skip', go:'空仓', ev:{ k:'⑫核对', v:'有五问未过 → 空仓' } }
+  ],
+  why:'为什么把核对放在最后而不是最前？因为背景判断需要的是"看到什么说什么"，而核对需要的是"否定自己"。这两件事放在一起做，会互相干扰。'
+});
+
+N('n_go', {
+  label:'执行', tag:'执行', title:'打这一单：把三件事写在纸上',
+  sub:'入场方式、止损位置、目标位。三个都写下来了，再点下单。',
+  tips:[
+    '<b>入场：</b>stop 单挂在信号 K 极值外 1 tick（顺势）；或限价单挂在极值外侧一点（只在上/下 1/3 的震荡里）。',
+    '<b>止损：</b>和你的入场逻辑一致。逻辑是"趋势恢复"就放到趋势起点；逻辑是"补完缺口就该走"才允许用信号 K 极值。',
+    '<b>目标：</b>最近的那个 MM / AB=CD / 待补缺口。到目标位就走，不要临时改主意。',
+    '<b>离场只有三种：</b>到目标 / 对手方 MTR / 初始止损。没有"感觉不太好先跑"。'
+  ],
+  backMain:'这单结束，准备下一笔',
+  back:'c_check'
+});
+
+N('n_skip', {
+  label:'空仓', tag:'执行', title:'这一单不做：空仓也是一种仓位',
+  sub:'写下来为什么不做。这段记录比任何一笔盈利的单子都值钱。',
+  tips:[
+    '记录格式：时间 / 我看到什么 / 我想做什么 / 哪个条件不满足 / 后来怎么走了。',
+    '<b>事后一定要回头看这一条。</b>如果它后来真的走成了，那说明你缺的是那一个理由；如果它果然失败了，那你会开始相信这套规则。',
+    '不做的理由越具体，下一次能做的机会就越清楚。'
+  ],
+  backMain:'回去把五问再过一遍',
+  back:'c_check'
+});
+
+/* 从结论卡进入核对 */
+const ENTRY_POINTS = ['s_strong','s_channel','s_resume','s_range'];
+ENTRY_POINTS.forEach(id => {
+  const nd = FLOW[id];
+  nd.exits = nd.exits || [];
+  nd.exits.push({ w:'act', to:'c_check', name:'该看的都看了——理由凑够了吗？', desc:'下单前过一遍五个问题，有一个不过就不打', go:'开单前核对' });
+});
+
+/* 判读卡自动补「下一步」 */
 Object.keys(FLOW).forEach(id => {
   const nd = FLOW[id];
-  if (nd.kind !== 'n') return;
-  nd.sect = '下一步';
-  nd.opts = [
-    { main:'继续观察，保持当前判断', note:'回到「' + FLOW[nd.back].title + '」', to:nd.back, go:'返回' },
-    { main:'重新扫一遍结构，从头判断', note:'市场已经变了，旧判断不再适用', to:'q1', go:'回 ② 重判' }
-  ];
+  if (nd.kind !== 'n' || nd.opts) return;
+  nd.sect = nd.sect || '下一步';
+  nd.opts = [];
+  if (nd.back && FLOW[nd.back]){
+    nd.opts.push({
+      main: nd.backMain || '保持这个判断，继续盯',
+      note: '回到「' + FLOW[nd.back].label + '」',
+      to: nd.back, go: '返回'
+    });
+  }
+  nd.opts.push({
+    main: nd.backAlt || '重新扫一遍缺口',
+    note: '行情变了，旧结论不再适用',
+    to: 'q1', go: '回 ② 重扫'
+  });
 });
 
 /* =========================================================
-   把状态卡的「出路」展开成子卡：
-   同一条出路下超过 1 条证据时，先问「是哪一条」；
-   只有 1 条证据时，直接跳到目标，不再多一次点击。
+   导航
    ========================================================= */
-function buildExits(){
-  const ids = Object.keys(FLOW).filter(id => FLOW[id].kind === 's' && FLOW[id].exits);
-  ids.forEach(id => {
-    const nd = FLOW[id];
-    nd.exitCards = nd.exits.map(ex => {
-      const items = nd.opts.filter(o => (o.w || 'none') === ex.w && o.to === ex.to);
-      const base = { w:ex.w, name:ex.name, desc:ex.desc, to:ex.to, go:ex.go, goalLabel:FLOW[ex.to].label };
-      if (items.length <= 1) return Object.assign(base, { direct:true });
-
-      const cid = id + '__' + ex.w + '__' + ex.to;
-      FLOW[cid] = {
-        kind:'e', tone:nd.tone, label:ex.name, tag:'核对证据',
-        title: ex.w === 'dec' ? '哪一条决定性证据成立？'
-             : ex.w === 'sup' ? '哪一条辅助证据成立？'
-             : '确认：真的都没有？',
-        sub: ex.w === 'dec' ? '任一条成立即可改判。一条都不确定时，不要在这里硬下结论。'
-           : ex.w === 'sup' ? '单条只能降级。出现两条以上共振，才按决定性处理。'
-           : '保持原判断，但不要停止记录。',
-        opts: items.map(it => ({ main:it.main, note:it.note, to:ex.to, go: it.go || ex.go })),
-        why: nd.why
-      };
-      return Object.assign(base, { to:cid, count:items.length });
-    });
-  });
-}
-buildExits();
-
-/* =========================================================
-   导航状态
-   ========================================================= */
-const START = 'q1';
+const START = 'p1';
 let trail = [START];
 let pos = 0;
+let evd = [];
 
 const cardWrap = document.getElementById('cardWrap');
 const crumbEl  = document.getElementById('crumb');
 const railEl   = document.getElementById('railMap');
+const railEvEl = document.getElementById('railEv');
 const trailEl  = document.getElementById('railTrail');
 const toastEl  = document.getElementById('toast');
 
 const TONE_CLASS = { blue:'t-blue', green:'t-green', amber:'t-amber', red:'t-red', slate:'t-slate' };
 
+function esc(s){ return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 function optHTML(o, i){
   const num = i + 1;
-  let badge = '';
-  let cls = '';
+  let badge = '', cls = '';
   if (o.w === 'dec'){ badge = '<span class="w">决定性</span>'; cls = ' dec'; }
   else if (o.w === 'sup'){ badge = '<span class="w">辅助</span>'; cls = ' sup'; }
   else if (o.w === 'none'){ badge = '<span class="w">无变化</span>'; cls = ' none'; }
-  return '<li><button class="opt' + cls + '" data-to="' + o.to + '" style="animation-delay:' + (i * 22) + 'ms">' +
+  return '<li><button class="opt' + cls + '" data-to="' + o.to + '" data-i="' + i + '" style="animation-delay:' + (i * 22) + 'ms">' +
     '<span class="k">' + num + '</span>' +
     '<span class="txt"><span class="main">' + badge + o.main + '</span>' +
       (o.note ? '<span class="note">' + o.note + '</span>' : '') +
@@ -738,48 +1241,57 @@ function optHTML(o, i){
 }
 
 function exitHTML(ex, i){
-  const cls = ex.w === 'dec' ? 'dec' : ex.w === 'sup' ? 'sup' : 'none';
-  const wl  = ex.w === 'dec' ? '决定性' : ex.w === 'sup' ? '辅助' : '无变化';
-  const tail = ex.count ? ex.count + ' 条' : '直接前往';
-  return '<li><button class="exit ' + cls + '" data-to="' + ex.to + '" style="animation-delay:' + (i * 30) + 'ms">' +
+  const cls = ex.w === 'dec' ? 'dec' : ex.w === 'sup' ? 'sup' : ex.w === 'act' ? 'act' : ex.w === 'chk' ? 'chk' : 'none';
+  const wl  = ex.w === 'dec' ? '决定性' : ex.w === 'sup' ? '辅助' : ex.w === 'act' ? '动作' : ex.w === 'chk' ? '验证' : '无变化';
+  return '<li><button class="exit ' + cls + '" data-to="' + ex.to + '" style="animation-delay:' + (i * 26) + 'ms">' +
     '<span class="ex-top"><span class="w">' + wl + '</span>' +
-      '<span class="ex-name">' + ex.name + '</span>' +
-      '<span class="ex-n">' + tail + '</span></span>' +
+      '<span class="ex-name">' + ex.name + '</span></span>' +
     '<span class="ex-desc">' + ex.desc + '</span>' +
-    '<span class="ex-go">' + ex.goalLabel + '<i>→</i></span>' +
+    '<span class="ex-go">' + FLOW[ex.to].label + '<i>→</i></span>' +
   '</button></li>';
+}
+
+function playHTML(play){
+  if (!play) return '';
+  return '<div class="play">' +
+    '<div class="pc"><h5>入场</h5><p>' + play.entry + '</p></div>' +
+    '<div class="pc"><h5>止损</h5><p>' + play.stop + '</p></div>' +
+    '<div class="pc"><h5>目标</h5><p>' + play.target + '</p></div>' +
+  '</div>';
 }
 
 function render(id, dir){
   const nd = FLOW[id];
-  const isState = nd.kind === 's';
-
   let html = '<div class="card ' + (TONE_CLASS[nd.tone] || 't-blue') + '">';
+
   html += '<div class="card-top">';
-  if (isState){
-    html += '<span class="chip-kind">市场状态</span><span class="chip-flag">持续监控中</span>';
-  } else if (nd.kind === 'e'){
-    const prevLabel = trail[pos - 1] ? FLOW[trail[pos - 1]].label : '来自状态卡';
-    html += '<span class="chip-kind">核对证据</span><span class="chip-flag">' + prevLabel + '</span>';
-  } else if (nd.kind === 'n'){
-    html += '<span class="chip-kind">观察结论</span>';
-  } else {
-    html += '<span class="chip-kind">' + nd.tag + '</span><span class="chip-flag">' + nd.flag + '</span>';
-  }
+  if (nd.kind === 's')      html += '<span class="chip-kind">结论</span><span class="chip-flag">' + (nd.flag || '持续监控') + '</span>';
+  else if (nd.kind === 'n') html += '<span class="chip-kind">' + (nd.tag || '判读') + '</span>';
+  else if (nd.kind === 'c') html += '<span class="chip-kind">' + (nd.tag || '核对') + '</span><span class="chip-flag">' + (nd.flag || '') + '</span>';
+  else                      html += '<span class="chip-kind">' + (nd.tag || '') + '</span><span class="chip-flag">' + (nd.flag || '') + '</span>';
   html += '</div>';
 
   html += '<h2 class="card-title">' + nd.title + '</h2>';
   if (nd.sub) html += '<p class="card-sub">' + nd.sub + '</p>';
   if (nd.stance) html += '<div class="stance"><span class="ic">▸</span><span>' + nd.stance + '</span></div>';
+  if (nd.observe) html += '<div class="observe"><span class="lb">图上指出</span><span>' + nd.observe + '</span></div>';
+
+  if (nd.play) html += '<div class="sect">怎么打</div>' + playHTML(nd.play);
+
+  if (nd.checklist){
+    html += '<div class="sect">' + (nd.listSect || '照着做') + '</div>';
+    html += '<ul class="tips">' + nd.checklist.map(t => '<li>' + t + '</li>').join('') + '</ul>';
+  }
+
   if (nd.tips){
     html += '<ul class="tips">' + nd.tips.map(t => '<li>' + t + '</li>').join('') + '</ul>';
   }
 
-  if (isState && nd.exitCards){
-    html += '<div class="sect">' + nd.sect + '</div>';
-    html += '<ul class="exits">' + nd.exitCards.map((ex, i) => exitHTML(ex, i)).join('') + '</ul>';
-  } else {
-    html += '<div class="sect">' + (nd.sect || '选择最接近你看到的情况') + '</div>';
+  if (nd.kind === 's' && nd.exits){
+    html += '<div class="sect">' + (nd.sect || '什么时候改判') + '</div>';
+    html += '<ul class="exits">' + nd.exits.map((ex, i) => exitHTML(ex, i)).join('') + '</ul>';
+  } else if (nd.opts){
+    html += '<div class="sect">' + (nd.sect || '选最接近你看到的那个') + '</div>';
     html += '<ul class="opts">' + nd.opts.map((o, i) => optHTML(o, i)).join('') + '</ul>';
   }
 
@@ -794,11 +1306,18 @@ function render(id, dir){
   cardWrap.classList.add(dir < 0 ? 'back' : 'fwd');
 
   cardWrap.querySelectorAll('[data-to]').forEach(b => {
-    b.addEventListener('click', () => go(b.dataset.to));
+    b.addEventListener('click', () => {
+      const oi = b.dataset.i;
+      if (oi !== undefined && nd.opts && nd.opts[+oi] && nd.opts[+oi].ev){
+        evd.push(nd.opts[+oi].ev);
+      }
+      go(b.dataset.to);
+    });
   });
 
   renderCrumb(id);
   renderRail(id);
+  renderEv();
   document.getElementById('btnBack').disabled = (pos === 0);
   document.querySelector('.stage').scrollTo({ top:0, behavior:'smooth' });
 }
@@ -811,12 +1330,21 @@ function renderCrumb(id){
   crumbEl.innerHTML = s;
 }
 
+function renderEv(){
+  if (!evd.length){
+    railEvEl.innerHTML = '<li class="evempty">还没开始。每走一步，这里会攒下一条你能拿去复盘的证据。</li>';
+    return;
+  }
+  railEvEl.innerHTML = evd.map(e =>
+    '<li class="evrow"><span class="k">' + esc(e.k) + '</span><span class="v">' + esc(e.v) + '</span></li>'
+  ).join('');
+}
+
 function renderRail(id){
-  const MAP = ['s_trend','s_channel','s_range','s_ttr','s_weak'];
-  const base = FLOW[id].kind === 'e' ? id.split('__')[0] : id;
+  const MAP = ['s_strong','s_channel','s_resume','s_range','s_ttr','s_wait'];
   railEl.innerHTML = MAP.map(k => {
     const n = FLOW[k];
-    return '<button class="map-item ' + n.mapClass + (k === base ? ' on' : '') + '" data-jump="' + k + '">' +
+    return '<button class="map-item ' + n.mapClass + (k === id ? ' on' : '') + '" data-jump="' + k + '">' +
       '<span class="dot"></span>' + n.label + '</button>';
   }).join('');
   railEl.querySelectorAll('[data-jump]').forEach(b => {
@@ -833,6 +1361,7 @@ function renderRail(id){
       const dir = i < pos ? -1 : 1;
       pos = i;
       trail = trail.slice(0, i + 1);
+      evd = evd.slice(0, i);
       render(trail[i], dir);
     });
   });
@@ -850,12 +1379,14 @@ function back(){
   if (pos === 0) return;
   pos -= 1;
   trail = trail.slice(0, pos + 1);
+  evd = evd.slice(0, pos);
   render(trail[pos], -1);
 }
 
 function restart(){
   trail = [START];
   pos = 0;
+  evd = [];
   render(START, -1);
 }
 
@@ -877,11 +1408,17 @@ function pad(n){ return n < 10 ? '0' + n : '' + n; }
 function copySummary(){
   const d = new Date();
   const time = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  const path = trail.slice(0, pos + 1).map(t => FLOW[t].label).join(' › ');
   const cur = FLOW[trail[pos]];
-  const text = 'ZPA 判断 ' + time + '\n' +
-               '路径：' + path + '\n' +
-               '当前：' + cur.title + (cur.stance ? '\n动作：' + cur.stance.replace(/<[^>]+>/g, '') : '');
+  let text = 'ZPA 读盘 ' + time + '\n';
+  text += '路径：' + trail.slice(0, pos + 1).map(t => FLOW[t].label).join(' › ') + '\n';
+  if (evd.length){
+    text += '证据：\n';
+    evd.forEach(e => { text += '  · ' + e.k + '：' + e.v + '\n'; });
+  }
+  text += '结论：' + cur.title.replace(/<[^>]+>/g, '') + '\n';
+  if (cur.stance) text += '动作：' + cur.stance.replace(/<[^>]+>/g, '').replace(/▸/g, '').trim() + '\n';
+  if (cur.play) text += '入场：' + cur.play.entry.replace(/<[^>]+>/g, '') + '\n止损：' + cur.play.stop.replace(/<[^>]+>/g, '') + '\n目标：' + cur.play.target.replace(/<[^>]+>/g, '') + '\n';
+
   const done = () => flash('已复制');
   if (navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
@@ -915,7 +1452,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* =========================================================
-   Tab 切换
+   Tab
    ========================================================= */
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -926,24 +1463,25 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 /* =========================================================
-   状态地图（迁移表）
+   状态地图
    ========================================================= */
-const MAP_ORDER = ['s_trend','s_channel','s_range','s_ttr','s_weak'];
+const MAP_ORDER = ['s_strong','s_channel','s_resume','s_range','s_ttr','s_wait','s_weak'];
 
 function buildMap(){
   const el = document.getElementById('mapTable');
   let html = '<h3>状态迁移表 · 点「去哪」可直接跳到那一步</h3>';
   MAP_ORDER.forEach(k => {
     const n = FLOW[k];
+    if (!n.exits) return;
     html += '<div class="mrow">' +
-      '<div class="mstate ' + n.mapClass + '">' + n.label + '<small>' + n.sub + '</small></div>' +
+      '<div class="mstate ' + n.mapClass + '">' + n.label + '<small>' + n.title + '</small></div>' +
       '<div class="medges">' +
-        n.opts.map(o => {
-          const cls = o.w === 'dec' ? 'w-dec' : o.w === 'sup' ? 'w-sup' : 'w-none';
+        n.exits.map(ex => {
+          const cls = ex.w === 'dec' ? 'w-dec' : ex.w === 'sup' ? 'w-sup' : ex.w === 'act' ? 'w-act' : ex.w === 'chk' ? 'w-chk' : 'w-none';
           return '<div class="mline ' + cls + '">' +
-            '<span class="ev">' + o.main + '</span>' +
+            '<span class="ev">' + ex.name + '</span>' +
             '<span class="ar">→</span>' +
-            '<span class="to" data-jump="' + o.to + '">' + FLOW[o.to].label + '</span>' +
+            '<span class="to" data-jump="' + ex.to + '">' + FLOW[ex.to].label + '</span>' +
           '</div>';
         }).join('') +
       '</div>' +
@@ -963,10 +1501,9 @@ function buildMap(){
    ========================================================= */
 buildMap();
 
-/* 支持用 #s_trend 这样的锚点直接打开某个状态（便于分享/书签） */
 (() => {
   const h = decodeURIComponent((location.hash || '').replace('#', ''));
-  if (h === 'map' || h === 'rule'){ switchTab(h); return; }
+  if (h === 'gap' || h === 'sr' || h === 'exec' || h === 'map'){ switchTab(h); return; }
   if (h && FLOW[h]){ trail = [h]; pos = 0; }
 })();
 
